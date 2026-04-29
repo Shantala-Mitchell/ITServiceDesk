@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>IT Service Desk — Log a Request</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,wght@0,300;0,600;1,300&display=swap" rel="stylesheet" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --ink:    #0f1117;
+    --paper:  #f5f2eb;
+    --mid:    #e8e3d8;
+    --rule:   #d4cdc0;
+    --accent: #c94f2c;
+    --ok:     #2a7c5f;
+    --warn:   #c47d1a;
+    --muted:  #7a7469;
+  }
+  body { font-family: 'DM Mono', monospace; background: var(--paper); color: var(--ink); min-height: 100vh; font-size: 13px; }
+
+  nav { display: flex; align-items: center; border-bottom: 2px solid var(--ink); background: var(--ink); padding: 0 24px; }
+  .nav-brand { font-family: 'Fraunces', serif; font-size: 18px; font-weight: 600; color: var(--paper); letter-spacing: -0.03em; padding: 14px 0; }
+  .nav-brand span { color: var(--accent); }
+
+  .wrap { padding: 40px 24px; max-width: 700px; margin: 0 auto; }
+
+  .form-header { margin-bottom: 32px; }
+  .form-header h1 { font-family: 'Fraunces', serif; font-size: 30px; font-weight: 300; line-height: 1.2; letter-spacing: -0.02em; }
+  .form-header p { color: var(--muted); margin-top: 8px; line-height: 1.7; }
+
+  .field { margin-bottom: 20px; }
+  .field label { display: block; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+  input[type=text], input[type=email], select, textarea {
+    width: 100%; background: #fff; border: 1.5px solid var(--rule); border-radius: 3px;
+    font-family: 'DM Mono', monospace; font-size: 13px; color: var(--ink);
+    padding: 10px 12px; outline: none; transition: border-color .15s; appearance: none;
+  }
+  input:focus, select:focus, textarea:focus { border-color: var(--ink); }
+  textarea { resize: vertical; min-height: 110px; }
+  .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+  /* PRIORITY PILLS */
+  .pill-group { display: flex; gap: 8px; flex-wrap: wrap; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 8px 16px; border: 1.5px solid var(--rule); border-radius: 100px;
+    background: #fff; cursor: pointer; font-family: 'DM Mono', monospace;
+    font-size: 12px; user-select: none; transition: background .15s, border-color .15s, color .15s;
+  }
+  .pill-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--rule); flex-shrink: 0; transition: background .15s; }
+  .pill.active { border-color: var(--ink); background: var(--ink); color: var(--paper); }
+  .pill.active.p-low      .pill-dot { background: var(--ok); }
+  .pill.active.p-medium   .pill-dot { background: var(--warn); }
+  .pill.active.p-high     .pill-dot { background: var(--accent); }
+  .pill.active.p-critical .pill-dot { background: #b91c1c; }
+
+  .submit-btn {
+    background: var(--ink); color: var(--paper); border: none;
+    font-family: 'DM Mono', monospace; font-size: 12px; letter-spacing: 0.1em;
+    text-transform: uppercase; padding: 13px 32px; border-radius: 3px;
+    cursor: pointer; margin-top: 8px; transition: background .15s, transform .1s;
+  }
+  .submit-btn:hover { background: #2a2f42; }
+  .submit-btn:active { transform: scale(0.98); }
+  .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  .toast { display: none; padding: 13px 18px; border-radius: 3px; margin-top: 16px; font-size: 12px; line-height: 1.6; }
+  .toast.success { background: var(--ok); color: #fff; }
+  .toast.error   { background: #b91c1c; color: #fff; }
+
+  @media (max-width: 500px) { .row-2 { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-brand">IT<span>desk</span></div>
+</nav>
+
+<div class="wrap">
+  <div class="form-header">
+    <h1>Log an IT request</h1>
+    <p>Tell us what's happening and we'll get back to you as soon as we can.</p>
+  </div>
+
+  <div class="field">
+    <label>Your name</label>
+    <input type="text" id="f-name" placeholder="Full name" />
+  </div>
+
+  <div class="row-2">
+    <div class="field">
+      <label>Email</label>
+      <input type="email" id="f-email" placeholder="you@ecnz.ac.nz" />
+    </div>
+    <div class="field">
+      <label>Department</label>
+      <select id="f-dept">
+        <option value="">— select —</option>
+        <option>Academic</option>
+        <option>Administration</option>
+        <option>Finance</option>
+        <option>HR</option>
+        <option>Leadership</option>
+        <option>Operations</option>
+        <option>Other</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="field">
+    <label>Category</label>
+    <select id="f-cat">
+      <option value="">— select —</option>
+      <option>Account / Access</option>
+      <option>Device / Hardware</option>
+      <option>Email / Outlook</option>
+      <option>Microsoft 365 / Teams</option>
+      <option>Network / Internet</option>
+      <option>Printer / Peripheral</option>
+      <option>Software / Application</option>
+      <option>Other</option>
+    </select>
+  </div>
+
+  <div class="field">
+    <label>Subject</label>
+    <input type="text" id="f-subject" placeholder="Short description of the issue" />
+  </div>
+
+  <div class="field">
+    <label>Details</label>
+    <textarea id="f-desc" placeholder="What's happening? Any error messages? When did it start?"></textarea>
+  </div>
+
+  <div class="field">
+    <label>Priority</label>
+    <div class="pill-group" id="pill-group">
+      <button type="button" class="pill p-low active"     onclick="selectPill(this)"><span class="pill-dot"></span>Low</button>
+      <button type="button" class="pill p-medium"         onclick="selectPill(this)"><span class="pill-dot"></span>Medium</button>
+      <button type="button" class="pill p-high"           onclick="selectPill(this)"><span class="pill-dot"></span>High</button>
+      <button type="button" class="pill p-critical"       onclick="selectPill(this)"><span class="pill-dot"></span>Critical</button>
+    </div>
+  </div>
+
+  <button class="submit-btn" id="submit-btn" onclick="submitTicket()">Submit request &rarr;</button>
+  <div class="toast" id="toast"></div>
+</div>
+
+<script>
+var FLOW_SUBMIT = ''; // ← paste Flow 1 URL here when ready
+
+var selectedPriority = 'low';
+
+function selectPill(el) {
+  document.querySelectorAll('.pill').forEach(function(p) { p.classList.remove('active'); });
+  el.classList.add('active');
+  selectedPriority = el.textContent.trim().toLowerCase();
+}
+
+function showToast(msg, type) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast ' + (type || 'success');
+  t.style.display = 'block';
+  setTimeout(function() { t.style.display = 'none'; }, 5000);
+}
+
+function genId() { return 'INC-' + String(Math.floor(1000 + Math.random() * 9000)); }
+
+function submitTicket() {
+  var name    = document.getElementById('f-name').value.trim();
+  var email   = document.getElementById('f-email').value.trim();
+  var dept    = document.getElementById('f-dept').value;
+  var cat     = document.getElementById('f-cat').value;
+  var subject = document.getElementById('f-subject').value.trim();
+  var desc    = document.getElementById('f-desc').value.trim();
+
+  if (!name || !email || !dept || !cat || !subject || !desc) {
+    showToast('Please fill in all fields before submitting.', 'error');
+    return;
+  }
+
+  var ticket = {
+    id: genId(), name: name, email: email, dept: dept,
+    cat: cat, subject: subject, desc: desc,
+    priority: selectedPriority, status: 'open',
+    notes: '', replies: [], created: new Date().toISOString()
+  };
+
+  var btn = document.getElementById('submit-btn');
+  btn.disabled = true;
+  btn.textContent = 'Submitting\u2026';
+
+  if (FLOW_SUBMIT) {
+    fetch(FLOW_SUBMIT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(ticket)
+    })
+    .then(function(r) {
+      if (!r.ok) throw new Error('Flow error');
+      showToast('\u2713 Request logged \u2014 we will be in touch soon.', 'success');
+      clearForm();
+    })
+    .catch(function() {
+      showToast('\u26A0 Could not submit. Please try again or contact IT directly.', 'error');
+    })
+    .finally(function() {
+      btn.disabled = false;
+      btn.textContent = 'Submit request \u2192';
+    });
+  } else {
+    // Demo mode — save to localStorage
+    var stored = [];
+    try { stored = JSON.parse(localStorage.getItem('itdesk_tickets') || '[]'); } catch(e) {}
+    stored.unshift(ticket);
+    localStorage.setItem('itdesk_tickets', JSON.stringify(stored));
+    showToast('\u2713 Request logged (demo mode \u2014 connect Power Automate to go live).', 'success');
+    clearForm();
+    btn.disabled = false;
+    btn.textContent = 'Submit request \u2192';
+  }
+}
+
+function clearForm() {
+  ['f-name', 'f-email', 'f-subject', 'f-desc'].forEach(function(id) {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('f-dept').value = '';
+  document.getElementById('f-cat').value  = '';
+  document.querySelectorAll('.pill').forEach(function(p) { p.classList.remove('active'); });
+  document.querySelector('.pill.p-low').classList.add('active');
+  selectedPriority = 'low';
+}
+</script>
+</body>
+</html>
