@@ -1,0 +1,1935 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>IT Service Desk — Agent Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.14.0/lib/msal-browser.min.js" crossorigin="anonymous"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,wght@0,300;0,600;1,300&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --ink:#0f1117;--paper:#f5f2eb;--mid:#e8e3d8;
+  --rule:#d4cdc0;--accent:#c94f2c;--ok:#2a7c5f;
+  --warn:#c47d1a;--muted:#7a7469;--tag:#ede9e0;
+}
+body{font-family:'DM Mono',monospace;background:var(--paper);color:var(--ink);min-height:100vh;font-size:13px;}
+
+/* NAV */
+nav{display:flex;align-items:center;border-bottom:2px solid var(--ink);background:var(--ink);padding:0 24px;gap:4px;flex-wrap:wrap;}
+.nav-brand{font-family:'Fraunces',serif;font-size:18px;font-weight:600;color:var(--paper);letter-spacing:-.03em;padding:14px 0;margin-right:16px;}
+.nav-brand span{color:var(--accent);}
+.nav-btn{background:none;border:none;color:#7a7469;font-family:'DM Mono',monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;padding:16px 14px;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;transition:color .15s;}
+.nav-btn:hover{color:var(--paper);}
+.nav-btn.active{color:var(--accent);border-bottom-color:var(--accent);}
+.nav-spacer{flex:1;}
+.nav-user{color:#aaa;font-size:11px;display:flex;align-items:center;gap:10px;padding:0 4px;}
+.nav-role{font-size:10px;letter-spacing:.08em;text-transform:uppercase;padding:2px 8px;border-radius:100px;background:#2a2f42;color:#aaa;}
+.nav-role.admin{background:#3d2a0a;color:#fbbf24;}
+.sign-out-btn{background:none;border:1px solid #444;color:#aaa;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;padding:4px 10px;border-radius:3px;cursor:pointer;transition:all .15s;}
+.sign-out-btn:hover{border-color:var(--accent);color:var(--accent);}
+
+/* AUTH */
+.auth-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;gap:20px;text-align:center;padding:24px;}
+.auth-wrap h2{font-family:'Fraunces',serif;font-size:28px;font-weight:300;}
+.auth-wrap p{color:var(--muted);font-size:12px;max-width:340px;line-height:1.8;}
+.ms-btn{display:inline-flex;align-items:center;gap:12px;background:#fff;border:1.5px solid var(--rule);padding:13px 28px;border-radius:3px;cursor:pointer;font-family:'DM Mono',monospace;font-size:13px;font-weight:500;transition:all .15s;}
+.ms-btn:hover{border-color:var(--ink);box-shadow:0 2px 10px rgba(0,0,0,.1);}
+.auth-err{color:var(--accent);font-size:12px;background:#fef2f2;border:1px solid #fca5a5;padding:10px 16px;border-radius:3px;max-width:380px;line-height:1.6;display:none;}
+
+/* PAGES */
+.page{display:none;padding:32px 24px;max-width:980px;margin:0 auto;}
+.page.active{display:block;}
+
+.banner{background:#fef3c7;border:1.5px solid #fbbf24;border-radius:4px;padding:12px 16px;margin-bottom:20px;font-size:12px;line-height:1.6;color:#92400e;}
+.banner strong{display:block;margin-bottom:2px;}
+
+.ph{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px;}
+.ph h1{font-family:'Fraunces',serif;font-size:26px;font-weight:300;letter-spacing:-.02em;}
+.pa{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+
+/* BUTTONS */
+.btn{padding:7px 14px;border-radius:3px;font-family:'DM Mono',monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;border:1.5px solid var(--rule);background:#fff;transition:all .15s;white-space:nowrap;}
+.btn:hover{border-color:var(--ink);background:var(--ink);color:var(--paper);}
+.btn.pri{background:var(--ink);color:var(--paper);border-color:var(--ink);}
+.btn.pri:hover{background:var(--accent);border-color:var(--accent);}
+.btn.ok{background:var(--ok);color:#fff;border-color:var(--ok);}
+.btn.ok:hover{background:#1f6347;border-color:#1f6347;}
+.btn.danger{color:#b91c1c;border-color:#fca5a5;}
+.btn.danger:hover{background:#b91c1c;border-color:#b91c1c;color:#fff;}
+.btn:disabled{opacity:.5;cursor:not-allowed;}
+.btn.sm{padding:4px 10px;font-size:10px;}
+
+/* STATS */
+.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:24px;}
+.sc{background:#fff;border:1.5px solid var(--rule);border-radius:4px;padding:14px 16px;position:relative;overflow:hidden;}
+.sc::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent);}
+.sc.ok::before{background:var(--ok);}
+.sc.warn::before{background:var(--warn);}
+.sc.crit::before{background:#b91c1c;}
+.sc.hold::before{background:#7c3aed;}
+.sn{font-size:28px;font-family:'Fraunces',serif;font-weight:600;line-height:1;}
+.sl{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-top:4px;}
+
+/* FILTERS */
+.filter-bar{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap;}
+.chip{padding:5px 12px;border:1.5px solid var(--rule);border-radius:100px;font-family:'DM Mono',monospace;font-size:11px;letter-spacing:.06em;text-transform:uppercase;background:#fff;cursor:pointer;transition:all .15s;}
+.chip:hover,.chip.active{background:var(--ink);color:var(--paper);border-color:var(--ink);}
+
+/* TABLE */
+.ticket-table{width:100%;border-collapse:collapse;}
+.ticket-table thead tr{border-bottom:2px solid var(--ink);text-align:left;}
+.ticket-table th{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:8px 10px;font-weight:500;cursor:pointer;user-select:none;white-space:nowrap;}
+.ticket-table th:hover{color:var(--ink);}
+.ticket-table th .sort-icon{margin-left:4px;opacity:.4;font-size:9px;}
+.ticket-table th.sorted .sort-icon{opacity:1;color:var(--accent);}
+.ticket-table tbody tr{border-bottom:1px solid var(--rule);transition:background .12s;cursor:pointer;}
+.ticket-table tbody tr:hover{background:var(--mid);}
+.ticket-table tbody tr.sla-breach{border-left:3px solid #b91c1c;}
+.ticket-table tbody tr.sla-warn{border-left:3px solid var(--warn);}
+.ticket-table td{padding:10px;vertical-align:middle;}
+.loading-row td{text-align:center;padding:40px;color:var(--muted);font-size:12px;}
+
+/* BADGES */
+.pri-badge{display:inline-flex;align-items:center;gap:5px;font-size:10px;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:100px;background:var(--tag);border:1px solid var(--rule);white-space:nowrap;}
+.pri-badge .dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+.dot-low{background:var(--ok);}.dot-medium{background:var(--warn);}.dot-high{background:var(--accent);}.dot-critical{background:#b91c1c;}
+
+.st-badge{font-size:10px;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:3px;white-space:nowrap;}
+.st-open{background:#fef3c7;color:#92400e;}
+.st-progress{background:#dbeafe;color:#1e3a5f;}
+.st-hold{background:#ede9fe;color:#5b21b6;}
+.st-resolved{background:#d1fae5;color:#065f46;}
+.st-closed{background:var(--tag);color:var(--muted);}
+
+.sla-badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-family:'DM Mono',monospace;padding:3px 8px;border-radius:3px;white-space:nowrap;font-weight:500;}
+.sla-ok{background:#d1fae5;color:#065f46;}
+.sla-warn{background:#fef3c7;color:#92400e;}
+.sla-breach{background:#fee2e2;color:#b91c1c;}
+.sla-hold{background:#ede9fe;color:#5b21b6;}
+.sla-met{background:var(--tag);color:var(--muted);}
+
+.asg-badge{font-size:10px;color:var(--muted);white-space:nowrap;}
+.asg-badge.me{color:var(--ok);}
+
+.tid{color:var(--muted);font-size:11px;}
+.ttitle{font-weight:500;}
+.tmeta{color:var(--muted);font-size:11px;}
+
+/* EMPTY */
+.empty{text-align:center;padding:60px 20px;color:var(--muted);}
+.empty .big{font-family:'Fraunces',serif;font-size:40px;opacity:.2;}
+
+/* PANEL */
+.ov{display:none;position:fixed;inset:0;background:rgba(15,17,23,.35);z-index:100;}
+.ov.open{display:block;}
+.panel{position:fixed;right:-520px;top:0;bottom:0;width:500px;background:var(--paper);border-left:2px solid var(--ink);z-index:101;transition:right .25s cubic-bezier(.4,0,.2,1);overflow-y:auto;padding:28px 28px 40px;display:flex;flex-direction:column;gap:16px;}
+.panel.open{right:0;}
+.plbl{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:6px;}
+.ptitle{font-family:'Fraunces',serif;font-size:20px;font-weight:300;line-height:1.3;}
+.pbody{line-height:1.7;color:#333;white-space:pre-wrap;}
+.pr{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.pmeta{color:var(--muted);font-size:11px;}
+select.psel{width:auto;padding:6px 10px;font-size:12px;background:#fff;border:1.5px solid var(--rule);border-radius:3px;font-family:'DM Mono',monospace;cursor:pointer;outline:none;}
+textarea.ptx{width:100%;border:1.5px solid var(--rule);border-radius:3px;font-family:'DM Mono',monospace;font-size:12px;padding:10px;background:#fff;resize:vertical;outline:none;transition:border-color .15s;}
+textarea.ptx:focus{border-color:var(--ink);}
+.ptx.notes{min-height:70px;}
+.ptx.reply{min-height:100px;}
+.ar{display:flex;gap:8px;flex-wrap:wrap;}
+.rt{display:flex;flex-direction:column;gap:10px;}
+.rb{background:#fff;border:1.5px solid var(--rule);border-radius:4px;padding:10px 14px;font-size:12px;line-height:1.6;}
+.rb.sent{background:#e8f4f0;border-color:#b2d8cc;}
+.rb-meta{font-size:10px;color:var(--muted);letter-spacing:.06em;margin-bottom:4px;text-transform:uppercase;}
+.div{border:none;border-top:1px solid var(--rule);}
+.rs{font-size:11px;color:var(--muted);}
+
+/* SLA panel */
+.sla-block{border:1.5px solid var(--rule);border-radius:4px;padding:14px 16px;background:#fff;}
+.sla-block.ok{background:#d1fae5;border-color:#6ee7b7;}
+.sla-block.warn{background:#fef3c7;border-color:#fbbf24;}
+.sla-block.breach{background:#fee2e2;border-color:#fca5a5;}
+.sla-block.hold{background:#ede9fe;border-color:#c4b5fd;}
+.sla-block.met{background:var(--tag);border-color:var(--rule);}
+.sla-cd{font-family:'Fraunces',serif;font-size:22px;font-weight:600;line-height:1;margin-bottom:4px;}
+.sla-lbl{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);}
+
+/* SETTINGS */
+.ss{background:#fff;border:1.5px solid var(--rule);border-radius:6px;margin-bottom:24px;overflow:hidden;}
+.ssh{padding:16px 20px;border-bottom:1px solid var(--rule);}
+.ssh h2{font-size:13px;font-weight:500;}
+.ssh p{font-size:11px;color:var(--muted);margin-top:2px;}
+.sb{padding:20px;}
+.sr{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--rule);gap:20px;}
+.sr:last-child{border-bottom:none;}
+.sr.col{flex-direction:column;align-items:flex-start;gap:6px;}
+.slbl{font-size:12px;font-weight:500;}
+.sdesc{font-size:11px;color:var(--muted);margin-top:3px;line-height:1.5;}
+.si{background:#fff;border:1.5px solid var(--rule);border-radius:3px;font-family:'DM Mono',monospace;font-size:12px;color:var(--ink);padding:7px 10px;outline:none;transition:border-color .15s;}
+.si:focus{border-color:var(--ink);}
+.si.wide{width:100%;font-size:11px;}
+.si:disabled{opacity:.5;cursor:not-allowed;background:var(--tag);}
+
+.toggle{position:relative;width:40px;height:22px;flex-shrink:0;}
+.toggle input{opacity:0;width:0;height:0;}
+.ts{position:absolute;inset:0;background:var(--rule);border-radius:22px;cursor:pointer;transition:background .2s;}
+.ts::before{content:'';position:absolute;width:16px;height:16px;left:3px;top:3px;background:#fff;border-radius:50%;transition:transform .2s;}
+.toggle input:checked+.ts{background:var(--ok);}
+.toggle input:checked+.ts::before{transform:translateX(18px);}
+.toggle input:disabled+.ts{opacity:.5;cursor:not-allowed;}
+
+.agent-list{display:flex;flex-direction:column;gap:8px;margin-bottom:14px;}
+.agent-row{display:flex;align-items:center;gap:8px;background:var(--paper);border:1.5px solid var(--rule);border-radius:4px;padding:10px 14px;}
+.agent-email{flex:1;font-size:12px;}
+.role-badge{font-size:10px;letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;border-radius:100px;background:var(--tag);border:1px solid var(--rule);color:var(--muted);}
+.role-badge.admin{background:#fef3c7;border-color:#fbbf24;color:#92400e;}
+.role-badge.you{border-style:dashed;}
+.rm-btn{background:none;border:none;color:var(--rule);font-size:16px;cursor:pointer;line-height:1;padding:2px 4px;transition:color .15s;}
+.rm-btn:hover{color:#b91c1c;}
+.add-row{display:flex;gap:8px;flex-wrap:wrap;}
+.save-bar{display:flex;align-items:center;gap:12px;margin-top:8px;}
+.saved{font-size:11px;color:var(--ok);display:none;}
+.admin-only-lock{font-size:11px;color:var(--muted);font-style:italic;}
+
+@media(max-width:640px){
+  .stats{grid-template-columns:1fr 1fr;}
+  .panel{width:100%;right:-100%;}
+  .pr{grid-template-columns:1fr;}
+}
+
+/* REPORTS */
+.report-section{display:none;}.report-section.active{display:block;}
+.report-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px;}
+.report-grid.two{grid-template-columns:repeat(2,1fr);}
+.report-grid.three{grid-template-columns:repeat(3,1fr);}
+.rc{background:#fff;border:1.5px solid var(--rule);border-radius:4px;padding:18px 20px;}
+.rc-title{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.rc-val{font-family:'Fraunces',serif;font-size:32px;font-weight:600;line-height:1;}
+.rc-sub{font-size:11px;color:var(--muted);margin-top:4px;}
+.rc-bar{height:6px;background:var(--mid);border-radius:3px;margin-top:10px;overflow:hidden;}
+.rc-bar-fill{height:100%;border-radius:3px;background:var(--ok);transition:width .6s ease;}
+.rc-bar-fill.warn{background:var(--warn);}
+.rc-bar-fill.crit{background:#b91c1c;}
+.report-panel{background:#fff;border:1.5px solid var(--rule);border-radius:4px;padding:20px;margin-bottom:20px;}
+.report-panel h2{font-size:12px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--rule);}
+.rp-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--rule);font-size:12px;gap:12px;}
+.rp-row:last-child{border-bottom:none;}
+.rp-label{color:var(--muted);flex:1;}
+.rp-val{font-weight:500;text-align:right;white-space:nowrap;}
+.rp-bar-wrap{flex:1;height:8px;background:var(--mid);border-radius:4px;overflow:hidden;min-width:60px;}
+.rp-bar-seg{height:100%;border-radius:4px;background:var(--ok);transition:width .6s ease;}
+.alert-row{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--rule);font-size:12px;}
+.alert-row:last-child{border-bottom:none;}
+.alert-sev{font-size:9px;letter-spacing:.08em;text-transform:uppercase;padding:2px 7px;border-radius:100px;white-space:nowrap;flex-shrink:0;margin-top:2px;}
+.sev-high{background:#fee2e2;color:#b91c1c;}
+.sev-medium{background:#fef3c7;color:#92400e;}
+.sev-low{background:#d1fae5;color:#065f46;}
+.sev-informational{background:var(--tag);color:var(--muted);}
+.alert-title{flex:1;font-weight:500;line-height:1.4;}
+.alert-meta{color:var(--muted);font-size:11px;white-space:nowrap;flex-shrink:0;}
+.config-note{background:#fef3c7;border:1.5px solid #fbbf24;border-radius:4px;padding:12px 16px;font-size:12px;color:#92400e;line-height:1.6;margin-bottom:20px;}
+.data-status{display:inline-flex;align-items:center;gap:6px;font-size:11px;padding:4px 10px;border-radius:100px;border:1px solid var(--rule);background:var(--tag);color:var(--muted);}
+.data-status.live{background:#d1fae5;border-color:#6ee7b7;color:#065f46;}
+.data-status.manual{background:#fef3c7;border-color:#fbbf24;color:#92400e;}
+.manual-entry-wrap{background:var(--paper);border:1.5px dashed var(--rule);border-radius:4px;padding:20px;margin-bottom:20px;}
+.manual-entry-wrap h3{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:12px;}
+.me-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+.me-field label{font-size:11px;color:var(--muted);display:block;margin-bottom:4px;}
+.me-field input{width:100%;font-family:'DM Mono',monospace;font-size:13px;font-weight:500;padding:8px 10px;border:1.5px solid var(--rule);border-radius:3px;background:#fff;outline:none;transition:border-color .15s;}
+.me-field input:focus{border-color:var(--ink);}
+@media(max-width:640px){
+  .me-grid{grid-template-columns:1fr 1fr;}
+  .report-grid{grid-template-columns:1fr 1fr;}
+}
+.export-item{display:block;width:100%;text-align:left;background:none;border:none;font-family:'DM Mono',monospace;font-size:12px;padding:10px 14px;cursor:pointer;color:var(--ink);transition:background .12s;}
+.export-item:hover{background:var(--mid);}
+@media print{body *{visibility:hidden;}.print-report,.print-report *{visibility:visible;}.print-report{position:fixed;inset:0;overflow:auto;}}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-brand">IT<span>desk</span></div>
+  <span id="nav-tabs" style="display:contents;visibility:hidden;">
+    <button class="nav-btn active" id="nb-tickets"  onclick="showPage('tickets')">Tickets</button>
+    <button class="nav-btn"        id="nb-archive"  onclick="showPage('archive')">Archive</button>
+    <button class="nav-btn"        id="nb-reports"  onclick="showPage('reports')">Reports</button>
+    <button class="nav-btn"        id="nb-settings" onclick="showPage('settings')">Settings</button>
+  </span>
+  <div class="nav-spacer"></div>
+  <div class="nav-user" id="nav-user" style="display:none">
+    <span class="nav-role" id="nav-role-badge">Agent</span>
+    <span id="nav-name"></span>
+    <button class="sign-out-btn" onclick="signOut()">Sign out</button>
+  </div>
+</nav>
+
+<!-- AUTH -->
+<div id="screen-auth" class="auth-wrap">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 23 23" width="44" height="44">
+    <rect x="1" y="1" width="10" height="10" fill="#f25022"/>
+    <rect x="12" y="1" width="10" height="10" fill="#7fba00"/>
+    <rect x="1" y="12" width="10" height="10" fill="#00a4ef"/>
+    <rect x="12" y="12" width="10" height="10" fill="#ffb900"/>
+  </svg>
+  <h2>Agent Dashboard</h2>
+  <p>Sign in with your Te Rito Maioha Microsoft account to continue.</p>
+  <button class="ms-btn" id="signin-btn" onclick="signIn()" disabled style="opacity:.5;cursor:not-allowed;">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 23 23" width="20" height="20">
+      <rect x="1" y="1" width="10" height="10" fill="#f25022"/>
+      <rect x="12" y="1" width="10" height="10" fill="#7fba00"/>
+      <rect x="1" y="12" width="10" height="10" fill="#00a4ef"/>
+      <rect x="12" y="12" width="10" height="10" fill="#ffb900"/>
+    </svg>
+    Loading…
+  </button>
+  <div class="auth-err" id="auth-err"></div>
+</div>
+
+<!-- DENIED -->
+<div id="screen-denied" style="display:none;" class="auth-wrap">
+  <div style="font-size:40px;opacity:.15">&#128683;</div>
+  <h2>Access Denied</h2>
+  <p id="denied-msg">Your account does not have permission to access this dashboard.</p>
+  <button class="ms-btn" onclick="signOut()" style="font-size:12px;padding:8px 18px;">Sign out</button>
+</div>
+
+<!-- TICKETS -->
+<div class="page" id="page-tickets">
+  <div id="flow-warn" class="banner" style="display:none">
+    <strong>Power Automate flows not configured</strong>
+    Add Flow URLs in Settings to connect to SharePoint. Showing local demo data until then.
+  </div>
+  <div class="ph">
+    <h1>All tickets</h1>
+    <div class="pa">
+      <span style="font-size:11px;color:var(--muted);" id="dash-date"></span>
+      <button class="btn" onclick="loadTickets()">&#8635; Refresh</button>
+      <button class="btn" onclick="exportCSV(false)">&#8659; Export CSV</button>
+    </div>
+  </div>
+  <div class="stats">
+    <div class="sc"><div class="sn" id="s-open">&#8212;</div><div class="sl">Open</div></div>
+    <div class="sc warn"><div class="sn" id="s-progress">&#8212;</div><div class="sl">In Progress</div></div>
+    <div class="sc hold"><div class="sn" id="s-hold">&#8212;</div><div class="sl">On Hold</div></div>
+    <div class="sc ok"><div class="sn" id="s-resolved">&#8212;</div><div class="sl">Closed</div></div>
+    <div class="sc crit"><div class="sn" id="s-breached">&#8212;</div><div class="sl">SLA Breached</div></div>
+  </div>
+  <div class="filter-bar">
+    <button class="chip active" onclick="setFilter('all',this)">All</button>
+    <button class="chip" onclick="setFilter('open',this)">Open</button>
+    <button class="chip" onclick="setFilter('unassigned',this)">Unassigned</button>
+    <button class="chip" onclick="setFilter('in-progress',this)">In Progress</button>
+    <button class="chip" onclick="setFilter('on-hold',this)">On Hold</button>
+    <button class="chip" onclick="setFilter('closed',this)">Closed</button>
+    <button class="chip" onclick="setFilter('mine',this)">Assigned to me</button>
+    <button class="chip" onclick="setFilter('breached',this)">SLA Breached</button>
+  </div>
+  <table class="ticket-table" id="main-table">
+    <thead>
+      <tr>
+        <th onclick="sortBy('id')"       data-col="id">ID<span class="sort-icon">&#8597;</span></th>
+        <th onclick="sortBy('subject')"  data-col="subject">Subject<span class="sort-icon">&#8597;</span></th>
+        <th onclick="sortBy('priority')" data-col="priority">Priority<span class="sort-icon">&#8597;</span></th>
+        <th onclick="sortBy('status')"   data-col="status">Status<span class="sort-icon">&#8597;</span></th>
+        <th>SLA</th>
+        <th onclick="sortBy('assignee')" data-col="assignee">Assigned<span class="sort-icon">&#8597;</span></th>
+        <th onclick="sortBy('created')"  data-col="created">Submitted<span class="sort-icon">&#8597;</span></th>
+      </tr>
+    </thead>
+    <tbody id="ticket-body"><tr class="loading-row"><td colspan="7">Loading&hellip;</td></tr></tbody>
+  </table>
+  <div class="empty" id="empty-state" style="display:none"><div class="big">&#10003;</div><p>No tickets match this filter.</p></div>
+</div>
+
+<!-- ARCHIVE -->
+<div class="page" id="page-archive">
+  <div class="ph">
+    <h1>Archive</h1>
+    <div class="pa"><button class="btn" onclick="exportCSV(true)">&#8659; Export CSV</button></div>
+  </div>
+  <p style="color:var(--muted);font-size:12px;margin-bottom:20px;">Closed tickets older than your archive threshold appear here.</p>
+  <table class="ticket-table">
+    <thead><tr><th>ID</th><th>Subject</th><th>Priority</th><th>Closed</th><th>Assigned</th></tr></thead>
+    <tbody id="archive-body"><tr class="loading-row"><td colspan="5">Loading&hellip;</td></tr></tbody>
+  </table>
+  <div class="empty" id="archive-empty" style="display:none"><div class="big">&#128193;</div><p>No archived tickets yet.</p></div>
+</div>
+
+<!-- SETTINGS -->
+<div class="page" id="page-settings">
+  <div class="ph"><h1>Settings</h1></div>
+
+  <!-- AGENTS -->
+  <div class="ss">
+    <div class="ssh"><h2>Agent Access &amp; Roles</h2><p>Manage who can access the dashboard and their permissions. Only admins can add or remove agents.</p></div>
+    <div class="sb">
+      <div class="agent-list" id="agent-list"></div>
+      <div id="agent-add-section">
+        <div class="add-row" id="add-agent-row">
+          <input type="email" id="new-agent-email" class="si" style="flex:1;min-width:200px;" placeholder="name@yourdomain.com" onkeydown="if(event.key==='Enter')addAgent()"/>
+          <select id="new-agent-role" class="si"><option value="agent">Agent</option><option value="admin">Administrator</option></select>
+          <button class="btn pri" onclick="addAgent()">+ Add</button>
+        </div>
+        <div id="agent-err" style="font-size:11px;color:var(--accent);margin-top:8px;display:none;"></div>
+      </div>
+      <div id="agent-locked-msg" style="display:none;" class="admin-only-lock">&#128274; Only administrators can add or remove agents.</div>
+      <div id="agent-source-msg" style="display:none;font-size:11px;color:var(--muted);font-style:italic;margin-top:8px;">&#128274; Agent management requires a FLOW_AGENTS server URL. To add or remove agents without one, edit DEFAULT_AGENTS in the source file and redeploy.</div>
+    </div>
+  </div>
+
+  <!-- SLA -->
+  <div class="ss">
+    <div class="ssh"><h2>SLA Targets</h2><p>Maximum response time before a ticket is flagged as breached. Admin only.</p></div>
+    <div class="sb">
+      <div class="sr">
+        <div><div class="slbl">&#128308; Critical</div><div class="sdesc">Complete system outage, no workaround</div></div>
+        <div style="display:flex;align-items:center;gap:6px;"><input type="number" id="s-sla-crit"   class="si" value="1"  min="1" style="width:60px;text-align:center;"/><span style="font-size:11px;color:var(--muted);">hrs</span></div>
+      </div>
+      <div class="sr">
+        <div><div class="slbl">&#128992; High</div><div class="sdesc">Individual cannot work, no workaround</div></div>
+        <div style="display:flex;align-items:center;gap:6px;"><input type="number" id="s-sla-high"   class="si" value="4"  min="1" style="width:60px;text-align:center;"/><span style="font-size:11px;color:var(--muted);">hrs</span></div>
+      </div>
+      <div class="sr">
+        <div><div class="slbl">&#128993; Medium</div><div class="sdesc">Issue with workaround available</div></div>
+        <div style="display:flex;align-items:center;gap:6px;"><input type="number" id="s-sla-med"    class="si" value="8"  min="1" style="width:60px;text-align:center;"/><span style="font-size:11px;color:var(--muted);">hrs</span></div>
+      </div>
+      <div class="sr">
+        <div><div class="slbl">&#128994; Low</div><div class="sdesc">Minor inconvenience</div></div>
+        <div style="display:flex;align-items:center;gap:6px;"><input type="number" id="s-sla-low"    class="si" value="24" min="1" style="width:60px;text-align:center;"/><span style="font-size:11px;color:var(--muted);">hrs</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- GENERAL -->
+  <div class="ss">
+    <div class="ssh"><h2>General</h2><p>Display and behaviour preferences</p></div>
+    <div class="sb">
+      <div class="sr">
+        <div><div class="slbl">Show demo data when no tickets</div><div class="sdesc">Fills dashboard with sample tickets until real ones arrive</div></div>
+        <label class="toggle"><input type="checkbox" id="s-demo" checked/><span class="ts"></span></label>
+      </div>
+      <div class="sr">
+        <div><div class="slbl">Auto-refresh every 5 minutes</div><div class="sdesc">Automatically reload tickets while the dashboard is open</div></div>
+        <label class="toggle"><input type="checkbox" id="s-autorefresh"/><span class="ts"></span></label>
+      </div>
+      <div class="sr">
+        <div><div class="slbl">Archive closed tickets after (days)</div><div class="sdesc">Closed tickets older than this move to the Archive tab</div></div>
+        <input type="number" id="s-archivedays" class="si" value="7" min="1" max="90" style="width:70px;text-align:center;"/>
+      </div>
+    </div>
+  </div>
+
+  <!-- FLOWS -->
+  <div class="ss">
+    <div class="ssh"><h2>Power Automate Flow URLs</h2><p>Connect to SharePoint — paste URLs here instead of editing the HTML</p></div>
+    <div class="sb">
+      <div class="sr col"><div class="slbl">Submit ticket</div> <input type="url" id="s-fl-submit"  class="si wide" placeholder="https://prod-xx..."/></div>
+      <div class="sr col"><div class="slbl">Get tickets</div>   <input type="url" id="s-fl-tickets" class="si wide" placeholder="https://prod-xx..."/></div>
+      <div class="sr col"><div class="slbl">Update ticket</div> <input type="url" id="s-fl-update"  class="si wide" placeholder="https://prod-xx..."/></div>
+      <div class="sr col"style="border-bottom:none"><div class="slbl">Send reply</div>   <input type="url" id="s-fl-reply"   class="si wide" placeholder="https://prod-xx..."/></div>
+    </div>
+  </div>
+
+  <!-- REPORT INTEGRATIONS -->
+  <div class="ss">
+    <div class="ssh"><h2>Report integrations</h2><p>Configure data sources for the Reports tab. Power Automate flows bridge APIs that don't support CORS.</p></div>
+    <div class="sb">
+      <div class="sr col"><div class="slbl">Phriendly Phishing — Flow URL</div><div class="sdesc">Power Automate flow that calls the Phriendly Phishing API and returns campaign JSON</div><input type="url" id="s-fl-phishing" class="si wide" placeholder="https://prod-xx..."/></div>
+      <div class="sr col" style="border-bottom:none"><div class="slbl">Syskit Point — Flow URL</div><div class="sdesc">Optional: Power Automate flow that returns Syskit governance snapshot JSON</div><input type="url" id="s-fl-syskit" class="si wide" placeholder="https://prod-xx..."/></div>
+    </div>
+  </div>
+
+  <div class="save-bar">
+    <button class="btn pri" onclick="saveSettings()">Save all settings</button>
+    <span class="saved" id="saved-msg">&#10003; Settings saved</span>
+  </div>
+</div>
+
+<!-- REPORTS -->
+<div class="page" id="page-reports">
+  <div class="ph">
+    <h1>Reports</h1>
+    <div class="pa">
+      <span id="report-updated" style="font-size:11px;color:var(--muted);"></span>
+      <button class="btn" onclick="refreshActiveReport()">&#8635; Refresh</button>
+      <div style="position:relative;display:inline-block;" id="export-wrap">
+        <button class="btn" onclick="toggleExportMenu()">&#8659; Export &#9662;</button>
+        <div id="export-menu" style="display:none;position:absolute;right:0;top:calc(100% + 4px);background:#fff;border:1.5px solid var(--ink);border-radius:4px;z-index:50;min-width:220px;box-shadow:0 4px 16px rgba(0,0,0,.12);">
+          <div style="padding:8px 14px;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--rule);">PDF — print / save</div>
+          <button class="export-item" onclick="exportReportPDF('active')">&#128196; Current section as PDF</button>
+          <button class="export-item" onclick="exportReportPDF('all')">&#128196; All sections as PDF</button>
+          <div style="padding:8px 14px;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);">CSV — raw data</div>
+          <button class="export-item" onclick="exportReportCSV('active')">&#128202; Current section as CSV</button>
+          <button class="export-item" onclick="exportReportCSV('all')">&#128202; All sections as CSV</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sub-nav -->
+  <div class="filter-bar" style="margin-bottom:28px;">
+    <button class="chip active" id="rc-tickets"  onclick="showReport('tickets',this)">&#127897; Tickets</button>
+    <button class="chip"        id="rc-defender" onclick="showReport('defender',this)">&#128737; Defender</button>
+    <button class="chip"        id="rc-phishing" onclick="showReport('phishing',this)">&#127907; Phriendly Phishing</button>
+    <button class="chip"        id="rc-syskit"   onclick="showReport('syskit',this)">&#128202; Syskit</button>
+  </div>
+
+  <!-- ══ TICKETS REPORT ══ -->
+  <div class="report-section active" id="rs-tickets">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
+      <span style="font-size:11px;color:var(--muted);">Computed from live ticket data · <span class="data-status live">&#9679; Live</span></span>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <select id="rpt-range" class="si" style="font-size:11px;padding:5px 8px;" onchange="renderTicketReport()">
+          <option value="7">Last 7 days</option>
+          <option value="30" selected>Last 30 days</option>
+          <option value="90">Last 90 days</option>
+          <option value="0">All time</option>
+        </select>
+      </div>
+    </div>
+    <div class="report-grid" id="rpt-stat-cards">
+      <div class="rc"><div class="rc-title">Total tickets</div><div class="rc-val" id="rpt-total">—</div><div class="rc-sub" id="rpt-total-sub"></div></div>
+      <div class="rc"><div class="rc-title">Resolved / closed</div><div class="rc-val" id="rpt-resolved">—</div><div class="rc-sub" id="rpt-resolved-sub"></div><div class="rc-bar"><div class="rc-bar-fill" id="rpt-resolved-bar" style="width:0%"></div></div></div>
+      <div class="rc"><div class="rc-title">SLA compliance</div><div class="rc-val" id="rpt-sla">—</div><div class="rc-sub">tickets met SLA target</div><div class="rc-bar"><div class="rc-bar-fill" id="rpt-sla-bar" style="width:0%"></div></div></div>
+      <div class="rc"><div class="rc-title">Unassigned</div><div class="rc-val" id="rpt-unassigned">—</div><div class="rc-sub">open with no agent</div></div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+      <div class="report-panel">
+        <h2>Tickets by category</h2>
+        <div id="rpt-by-cat"><div style="color:var(--muted);font-size:12px;">No data</div></div>
+      </div>
+      <div class="report-panel">
+        <h2>Tickets by priority</h2>
+        <div id="rpt-by-pri"><div style="color:var(--muted);font-size:12px;">No data</div></div>
+      </div>
+    </div>
+
+    <div class="report-panel">
+      <h2>Tickets by agent</h2>
+      <div id="rpt-by-agent"><div style="color:var(--muted);font-size:12px;">No data</div></div>
+    </div>
+  </div>
+
+  <!-- ══ DEFENDER REPORT ══ -->
+  <div class="report-section" id="rs-defender">
+    <div id="defender-config-note" class="config-note" style="display:none;">
+      <strong style="display:block;margin-bottom:4px;">Microsoft Graph permissions needed</strong>
+      To pull live Defender alerts, your Azure app registration needs the <strong>SecurityAlert.Read.All</strong> permission with admin consent. Add the permission in Azure AD → App registrations → your app → API permissions, then re-sign in. Until then, enter data manually below.
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
+      <span style="font-size:11px;color:var(--muted);"><span class="data-status" id="defender-status-badge">&#9679; Checking&hellip;</span></span>
+      <button class="btn sm" onclick="loadDefenderAlerts()">&#8635; Try live fetch</button>
+    </div>
+
+    <!-- Manual entry fallback -->
+    <div class="manual-entry-wrap" id="defender-manual">
+      <h3>Manual data entry — paste from Defender portal</h3>
+      <div class="me-grid" style="margin-bottom:12px;">
+        <div class="me-field"><label>High severity</label><input type="number" id="def-high" min="0" value="0" oninput="renderDefenderManual()"/></div>
+        <div class="me-field"><label>Medium severity</label><input type="number" id="def-med" min="0" value="0" oninput="renderDefenderManual()"/></div>
+        <div class="me-field"><label>Low severity</label><input type="number" id="def-low" min="0" value="0" oninput="renderDefenderManual()"/></div>
+        <div class="me-field"><label>Informational</label><input type="number" id="def-info" min="0" value="0" oninput="renderDefenderManual()"/></div>
+        <div class="me-field"><label>New (this week)</label><input type="number" id="def-new" min="0" value="0" oninput="renderDefenderManual()"/></div>
+        <div class="me-field"><label>Resolved (this week)</label><input type="number" id="def-resolved" min="0" value="0" oninput="renderDefenderManual()"/></div>
+      </div>
+      <button class="btn pri sm" onclick="saveDefenderManual()">Save snapshot</button>
+      <span class="saved" id="def-saved" style="font-size:11px;color:var(--ok);margin-left:10px;display:none;">&#10003; Saved</span>
+    </div>
+
+    <div class="report-grid" id="def-stat-cards">
+      <div class="rc"><div class="rc-title">High severity</div><div class="rc-val" id="def-s-high" style="color:#b91c1c;">—</div><div class="rc-sub">active alerts</div></div>
+      <div class="rc"><div class="rc-title">Medium severity</div><div class="rc-val" id="def-s-med" style="color:var(--warn);">—</div><div class="rc-sub">active alerts</div></div>
+      <div class="rc"><div class="rc-title">Low severity</div><div class="rc-val" id="def-s-low" style="color:var(--ok);">—</div><div class="rc-sub">active alerts</div></div>
+      <div class="rc"><div class="rc-title">Informational</div><div class="rc-val" id="def-s-info">—</div><div class="rc-sub">active alerts</div></div>
+    </div>
+
+    <div class="report-panel">
+      <h2>Recent alerts <span id="def-alerts-src" style="font-weight:400;text-transform:none;letter-spacing:0;font-size:11px;color:var(--muted);"></span></h2>
+      <div id="def-alert-list"><div style="color:var(--muted);font-size:12px;padding:12px 0;">Enter data above or connect live via Graph API.</div></div>
+    </div>
+  </div>
+
+  <!-- ══ PHISHING REPORT ══ -->
+  <div class="report-section" id="rs-phishing">
+    <div id="phishing-flow-note" class="config-note" style="display:none;">
+      <strong style="display:block;margin-bottom:4px;">Power Automate flow not configured</strong>
+      Add your Phriendly Phishing flow URL in Settings → Report integrations to pull campaign data automatically. Until then, enter data manually below.
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
+      <span style="font-size:11px;color:var(--muted);"><span class="data-status" id="phish-status-badge">&#9679; Manual</span></span>
+      <button class="btn sm" onclick="loadPhishingData()">&#8635; Try flow fetch</button>
+    </div>
+
+    <div class="manual-entry-wrap" id="phishing-manual">
+      <h3>Manual data entry — paste from Phriendly Phishing dashboard</h3>
+      <div class="me-grid" style="margin-bottom:12px;">
+        <div class="me-field"><label>Campaign name</label><input type="text" id="ph-campaign" placeholder="e.g. April 2025"/></div>
+        <div class="me-field"><label>Emails sent</label><input type="number" id="ph-sent" min="0" value="0" oninput="renderPhishingManual()"/></div>
+        <div class="me-field"><label>Opened email</label><input type="number" id="ph-opened" min="0" value="0" oninput="renderPhishingManual()"/></div>
+        <div class="me-field"><label>Clicked link</label><input type="number" id="ph-clicked" min="0" value="0" oninput="renderPhishingManual()"/></div>
+        <div class="me-field"><label>Submitted data</label><input type="number" id="ph-submitted" min="0" value="0" oninput="renderPhishingManual()"/></div>
+        <div class="me-field"><label>Reported phish</label><input type="number" id="ph-reported" min="0" value="0" oninput="renderPhishingManual()"/></div>
+        <div class="me-field"><label>Training completed</label><input type="number" id="ph-trained" min="0" value="0" oninput="renderPhishingManual()"/></div>
+        <div class="me-field"><label>At risk (%)&nbsp;</label><input type="number" id="ph-atrisk" min="0" max="100" value="0" oninput="renderPhishingManual()"/></div>
+      </div>
+      <button class="btn pri sm" onclick="savePhishingManual()">Save snapshot</button>
+      <span class="saved" id="ph-saved" style="font-size:11px;color:var(--ok);margin-left:10px;display:none;">&#10003; Saved</span>
+    </div>
+
+    <div class="report-grid" id="ph-stat-cards">
+      <div class="rc"><div class="rc-title">Click rate</div><div class="rc-val" id="ph-s-click">—</div><div class="rc-sub">clicked the link</div><div class="rc-bar"><div class="rc-bar-fill crit" id="ph-bar-click" style="width:0%"></div></div></div>
+      <div class="rc"><div class="rc-title">Report rate</div><div class="rc-val" id="ph-s-report">—</div><div class="rc-sub">reported the phish</div><div class="rc-bar"><div class="rc-bar-fill" id="ph-bar-report" style="width:0%"></div></div></div>
+      <div class="rc"><div class="rc-title">Training done</div><div class="rc-val" id="ph-s-trained">—</div><div class="rc-sub">completed training</div><div class="rc-bar"><div class="rc-bar-fill" id="ph-bar-trained" style="width:0%"></div></div></div>
+      <div class="rc"><div class="rc-title">At risk</div><div class="rc-val" id="ph-s-atrisk" style="color:#b91c1c;">—</div><div class="rc-sub">% of staff</div></div>
+    </div>
+
+    <div class="report-panel">
+      <h2>Campaign breakdown <span id="ph-campaign-label" style="font-weight:400;text-transform:none;letter-spacing:0;font-size:11px;color:var(--muted);"></span></h2>
+      <div id="ph-breakdown"><div style="color:var(--muted);font-size:12px;padding:12px 0;">Enter campaign data above to see the breakdown.</div></div>
+    </div>
+  </div>
+
+  <!-- ══ SYSKIT REPORT ══ -->
+  <div class="report-section" id="rs-syskit">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
+      <span style="font-size:11px;color:var(--muted);"><span class="data-status manual">&#9679; Manual</span> · Export from Syskit Point and paste figures here</span>
+    </div>
+
+    <div class="manual-entry-wrap">
+      <h3>Governance snapshot — paste from Syskit Point</h3>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px;" class="me-grid-4">
+        <!-- Teams & Groups -->
+        <div class="me-field"><label>Active Teams</label><input type="number" id="sk-teams" min="0" value="0" oninput="renderSyskitManual()"/></div>
+        <div class="me-field"><label>Inactive Teams</label><input type="number" id="sk-teams-inactive" min="0" value="0" oninput="renderSyskitManual()"/></div>
+        <div class="me-field"><label>M365 Groups</label><input type="number" id="sk-groups" min="0" value="0" oninput="renderSyskitManual()"/></div>
+        <div class="me-field"><label>Orphaned</label><input type="number" id="sk-orphaned" min="0" value="0" oninput="renderSyskitManual()"/></div>
+        <!-- Users -->
+        <div class="me-field"><label>Licensed users</label><input type="number" id="sk-users" min="0" value="0" oninput="renderSyskitManual()"/></div>
+        <div class="me-field"><label>Guest users</label><input type="number" id="sk-guests" min="0" value="0" oninput="renderSyskitManual()"/></div>
+        <div class="me-field"><label>Inactive users</label><input type="number" id="sk-inactive" min="0" value="0" oninput="renderSyskitManual()"/></div>
+        <div class="me-field"><label>Shared mailboxes</label><input type="number" id="sk-shared" min="0" value="0" oninput="renderSyskitManual()"/></div>
+        <!-- Sharing -->
+        <div class="me-field"><label>Anon share links</label><input type="number" id="sk-anon" min="0" value="0" oninput="renderSyskitManual()"/></div>
+        <div class="me-field"><label>Ext. share links</label><input type="number" id="sk-ext" min="0" value="0" oninput="renderSyskitManual()"/></div>
+        <div class="me-field"><label>Storage used (GB)</label><input type="number" id="sk-storage" min="0" value="0" step="0.1" oninput="renderSyskitManual()"/></div>
+        <div class="me-field"><label>Storage total (GB)</label><input type="number" id="sk-storage-total" min="0" value="0" step="0.1" oninput="renderSyskitManual()"/></div>
+      </div>
+      <button class="btn pri sm" onclick="saveSyskitManual()">Save snapshot</button>
+      <span class="saved" id="sk-saved" style="font-size:11px;color:var(--ok);margin-left:10px;display:none;">&#10003; Saved</span>
+    </div>
+
+    <div class="report-grid" id="sk-stat-cards">
+      <div class="rc"><div class="rc-title">Active Teams</div><div class="rc-val" id="sk-s-teams">—</div><div class="rc-sub" id="sk-s-teams-sub"></div></div>
+      <div class="rc"><div class="rc-title">Guest users</div><div class="rc-val" id="sk-s-guests" style="color:var(--warn);">—</div><div class="rc-sub">external access</div></div>
+      <div class="rc"><div class="rc-title">Anonymous links</div><div class="rc-val" id="sk-s-anon" style="color:#b91c1c;">—</div><div class="rc-sub">review recommended</div></div>
+      <div class="rc"><div class="rc-title">Storage used</div><div class="rc-val" id="sk-s-storage">—</div><div class="rc-sub" id="sk-s-storage-sub"></div><div class="rc-bar"><div class="rc-bar-fill warn" id="sk-bar-storage" style="width:0%"></div></div></div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+      <div class="report-panel">
+        <h2>Teams &amp; Groups</h2>
+        <div id="sk-teams-breakdown"><div style="color:var(--muted);font-size:12px;">Enter data above.</div></div>
+      </div>
+      <div class="report-panel">
+        <h2>Users</h2>
+        <div id="sk-users-breakdown"><div style="color:var(--muted);font-size:12px;">Enter data above.</div></div>
+      </div>
+    </div>
+
+    <div class="report-panel">
+      <h2>Sharing &amp; governance risks</h2>
+      <div id="sk-sharing-breakdown"><div style="color:var(--muted);font-size:12px;">Enter data above.</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- PANEL -->
+<div class="ov" id="panel-ov" onclick="closePanel()"></div>
+<div class="panel" id="panel">
+  <button class="btn sm" style="align-self:flex-end;" onclick="closePanel()">&#10005; close</button>
+  <div class="tid" id="p-id"></div>
+  <div class="ptitle" id="p-title"></div>
+  <div><div class="plbl">Original request</div><div class="pbody" id="p-body"></div></div>
+  <div class="pr">
+    <div>
+      <div class="plbl">Requester</div>
+      <div id="p-name" style="font-weight:500"></div>
+      <div id="p-email" class="pmeta"></div>
+      <div id="p-dept"  class="pmeta"></div>
+    </div>
+    <div><div class="plbl">Category</div><div id="p-cat"></div></div>
+  </div>
+  <div class="pr">
+    <div>
+      <div class="plbl">Priority</div>
+      <select class="psel" id="p-priority-sel" onchange="updatePriority()">
+        <option value="low">&#128994; Low</option>
+        <option value="medium">&#128993; Medium</option>
+        <option value="high">&#128992; High</option>
+        <option value="critical">&#128308; Critical</option>
+      </select>
+    </div>
+    <div><div class="plbl">Status</div><select class="psel" id="p-status-sel" onchange="updateStatus()"></select></div>
+  </div>
+  <div>
+    <div class="plbl">SLA</div>
+    <div class="sla-block" id="p-sla-block">
+      <div class="sla-cd" id="p-sla-cd">—</div>
+      <div class="sla-lbl" id="p-sla-lbl">—</div>
+    </div>
+  </div>
+  <div>
+    <div class="plbl">Assigned to</div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <select class="psel" id="p-asg-sel" onchange="updateAssignee()" style="flex:1;min-width:160px;"></select>
+      <button class="btn ok" id="pickup-btn" onclick="pickupTicket()">&#9995; Pick up</button>
+    </div>
+  </div>
+  <hr class="div"/>
+  <div><div class="plbl">Conversation</div><div class="rt" id="reply-thread"></div></div>
+  <div>
+    <div class="plbl">Reply to staff member</div>
+    <textarea class="ptx reply" id="p-reply" placeholder="Type your reply — this will be emailed to the requester&hellip;"></textarea>
+    <div style="display:flex;gap:8px;align-items:center;margin-top:8px;">
+      <button class="btn ok" id="send-btn" onclick="sendReply()">&#9993; Send reply</button>
+      <span class="rs" id="reply-status"></span>
+    </div>
+  </div>
+  <hr class="div"/>
+  <div>
+    <div class="plbl">Internal notes (not sent to staff)</div>
+    <textarea class="ptx notes" id="p-notes" placeholder="Add internal notes&hellip;"></textarea>
+  </div>
+  <div class="ar">
+    <button class="btn pri" onclick="saveNote()">Save notes</button>
+    <button class="btn" id="cycle-btn" onclick="cycleStatus()">Mark in progress</button>
+    <button class="btn danger" id="del-btn" onclick="deleteTicket()">Delete</button>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════
+   CONFIG
+═══════════════════════════════════════ */
+var CLIENT_ID = '4ae73f12-9d89-467d-9dec-79be71a18224';
+var TENANT_ID = '21827f82-8236-44d6-b5fe-bd2d5d65b3a9';
+var REDIRECT  = 'https://shantala-mitchell.github.io/ITServiceDesk/dashboard.html';
+
+// ─── AUTHORISED AGENTS ────────────────────────────────────────────────────────
+// This list is the source of truth for access control when no FLOW_AGENTS URL is set.
+// Edit this array and redeploy to add/remove agents or change roles.
+// WARNING: Do NOT read roles or access from localStorage — it is user-controlled
+// and can be modified in DevTools by anyone who has signed in with Microsoft.
+var DEFAULT_AGENTS = [{ email:'shantala.mitchell@ecnz.ac.nz', role:'admin' }];
+
+// Optional: set FLOW_AGENTS to a Power Automate flow URL that returns
+// [{ "email": "...", "role": "admin|agent" }, ...] for server-managed agent lists.
+// When set, DEFAULT_AGENTS is ignored and the server list is used exclusively.
+var FLOW_AGENTS   = '';  // e.g. 'https://prod-xx.australiasoutheast.logic.azure.com/...'
+
+var FLOW_TICKETS='', FLOW_UPDATE='', FLOW_REPLY='';
+
+// In-memory agent cache — populated after login, never written to localStorage.
+// Roles are resolved once per session and held here only.
+var _agentCache = null;
+
+/* ═══════════════════════════════════════
+   MSAL
+═══════════════════════════════════════ */
+var msalInstance = new msal.PublicClientApplication({
+  auth:{ clientId:CLIENT_ID, authority:'https://login.microsoftonline.com/'+TENANT_ID, redirectUri:REDIRECT, navigateToLoginRequestUrl:true },
+  // sessionStorage scopes tokens to the tab and is inaccessible after the session ends.
+  // localStorage persists tokens across tabs/restarts and is reachable by any JS on the origin.
+  cache:{ cacheLocation:'sessionStorage', storeAuthStateInCookie:false }
+});
+var loginRequest = { scopes:['User.Read','openid','profile'] };
+var currentUser  = null;
+var currentRole  = 'agent';
+var msalReady    = false;
+
+msalInstance.initialize().then(function(){
+  msalReady = true;
+  var btn = document.getElementById('signin-btn');
+  if(btn){ btn.disabled=false; btn.style.opacity=''; btn.style.cursor=''; btn.childNodes[btn.childNodes.length-1].textContent=' Sign in with Microsoft'; }
+  return msalInstance.handleRedirectPromise();
+}).then(function(resp){
+  var acct = (resp&&resp.account)?resp.account:null;
+  if (!acct){ var all=msalInstance.getAllAccounts(); if(all.length) acct=all[0]; }
+  if (acct){ msalInstance.setActiveAccount(acct); handleAuthSuccess(acct); }
+}).catch(function(e){ console.error('MSAL:',e); showAuthErr('Sign in error: '+(e.message||'Please try again.')); });
+
+function handleAuthSuccess(acct){
+  currentUser = acct;
+  applyStoredSettings();
+  document.getElementById('nav-name').textContent = acct.name||acct.username;
+  document.getElementById('nav-tabs').style.visibility='visible';
+  // Resolve the authorised agent list from server or source before granting access
+  resolveAgents().then(function(agents){
+    var me = agents.find(function(a){ return a.email.toLowerCase()===(acct.username||'').toLowerCase(); });
+    currentRole = (me && me.role==='admin') ? 'admin' : 'agent';
+    var rb = document.getElementById('nav-role-badge');
+    rb.textContent = currentRole==='admin'?'Admin':'Agent';
+    if(currentRole==='admin') rb.classList.add('admin');
+    document.getElementById('nav-user').style.display='flex';
+    document.getElementById('nb-settings').style.display = currentRole==='admin' ? '' : 'none';
+    document.getElementById('nb-reports').style.display = '';
+    checkAccess(acct.username, agents);
+  });
+}
+
+// resolveAgents — returns a Promise<agent[]>.
+// Fetches from FLOW_AGENTS if configured, otherwise uses DEFAULT_AGENTS from source.
+// Result is cached in _agentCache for the session (never written to localStorage).
+function resolveAgents(){
+  if(_agentCache) return Promise.resolve(_agentCache);
+  if(!FLOW_AGENTS){
+    _agentCache = DEFAULT_AGENTS.slice();
+    return Promise.resolve(_agentCache);
+  }
+  return fetch(FLOW_AGENTS, {method:'GET'})
+    .then(function(r){ if(!r.ok) throw new Error('Agent list fetch failed'); return r.json(); })
+    .then(function(data){
+      if(!Array.isArray(data)) throw new Error('Unexpected agent list format');
+      _agentCache = data;
+      return _agentCache;
+    })
+    .catch(function(e){
+      console.warn('Could not load agent list from server, falling back to DEFAULT_AGENTS:', e);
+      _agentCache = DEFAULT_AGENTS.slice();
+      return _agentCache;
+    });
+}
+
+function checkAccess(email, agents){
+  var allowed = agents.map(function(a){return a.email.toLowerCase();});
+  document.getElementById('screen-auth').style.display='none';
+  if(allowed.indexOf((email||'').toLowerCase())!==-1){
+    document.getElementById('screen-denied').style.display='none';
+    document.getElementById('page-tickets').classList.add('active');
+    if(!FLOW_TICKETS) document.getElementById('flow-warn').style.display='block';
+    loadTickets();
+    startSLATicker();
+  } else {
+    document.getElementById('denied-msg').textContent=(email||'Your account')+' does not have agent access. Contact your administrator.';
+    document.getElementById('screen-denied').style.display='flex';
+  }
+}
+
+function signIn(){
+  if(!msalReady){ showAuthErr('Still loading — please wait a moment and try again.'); return; }
+  showAuthErr('');
+  msalInstance.loginRedirect(loginRequest).catch(function(e){ showAuthErr('Sign in failed: '+(e.message||'Please try again.')); });
+}
+function signOut(){ msalInstance.logoutRedirect({postLogoutRedirectUri:REDIRECT}).catch(function(){window.location.reload();}); }
+function showAuthErr(m){ var e=document.getElementById('auth-err'); e.textContent=m; e.style.display=m?'block':'none'; }
+
+/* ═══════════════════════════════════════
+   PAGES
+═══════════════════════════════════════ */
+function showPage(p){
+  document.querySelectorAll('.page').forEach(function(el){el.classList.remove('active');});
+  document.querySelectorAll('.nav-btn').forEach(function(b){b.classList.remove('active');});
+  document.getElementById('page-'+p).classList.add('active');
+  document.getElementById('nb-'+p).classList.add('active');
+  if(p==='archive') renderArchive();
+  if(p==='reports'){ loadSyskitSaved(); loadDefenderSaved(); loadPhishingSaved(); renderTicketReport(); }
+  if(p==='settings'){
+    if(currentRole!=='admin'){ alert('Settings are restricted to administrators.'); return; }
+    loadSettingsUI();
+  }
+}
+
+/* ═══════════════════════════════════════
+   UTILS
+═══════════════════════════════════════ */
+var tickets=[], activeFilter='all', openId=null, sortCol='created', sortDir=-1;
+
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function relTime(ts){var d=Date.now()-new Date(ts).getTime();if(d<3600000)return Math.floor(d/60000)+'m ago';if(d<86400000)return Math.floor(d/3600000)+'h ago';return Math.floor(d/86400000)+'d ago';}
+function fmtDate(ts){return new Date(ts).toLocaleDateString('en-NZ',{day:'numeric',month:'short',year:'numeric'});}
+function fmtTime(ts){return new Date(ts).toLocaleString('en-NZ',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});}
+function fmtDur(ms){var h=Math.floor(ms/3600000);var m=Math.floor((ms%3600000)/60000);if(h>=24){var d=Math.floor(h/24);return d+'d '+(h%24)+'h';}if(h>0)return h+'h '+m+'m';return m+'m';}
+function genId(){return 'INC-'+String(Math.floor(1000+Math.random()*9000));}
+function saveLocal(){localStorage.setItem('itdesk_tickets',JSON.stringify(tickets));}
+
+function priBadge(p){return '<span class="pri-badge"><span class="dot dot-'+esc(p)+'"></span>'+esc(p)+'</span>';}
+function statusBadge(s){
+  var map={open:'st-open','in-progress':'st-progress','on-hold':'st-hold',resolved:'st-resolved',closed:'st-closed'};
+  var labels={open:'Open','in-progress':'In Progress','on-hold':'On Hold',resolved:'Resolved',closed:'Closed'};
+  return '<span class="st-badge '+(map[s]||'')+'">'+esc(labels[s]||s)+'</span>';
+}
+
+/* ═══════════════════════════════════════
+   SLA
+═══════════════════════════════════════ */
+var DEFAULT_SLA={critical:1,high:4,medium:8,low:24};
+
+function getSLATargets(){
+  var s=getStoredSettings();
+  return {
+    critical:(s.slaCrit||DEFAULT_SLA.critical)*3600000,
+    high:    (s.slaHigh||DEFAULT_SLA.high    )*3600000,
+    medium:  (s.slaMed ||DEFAULT_SLA.medium  )*3600000,
+    low:     (s.slaLow ||DEFAULT_SLA.low     )*3600000
+  };
+}
+
+function getSLAInfo(t){
+  if(t.status==='resolved'||t.status==='closed') return {state:'met',label:'SLA met',cd:'&#10003; Met'};
+  var targets=getSLATargets();
+  var target=targets[t.priority]||targets.low;
+  // elapsed time minus any hold time
+  var holdMs = t.holdDuration||0;
+  if(t.status==='on-hold'&&t.holdStart){
+    holdMs += (Date.now()-new Date(t.holdStart).getTime());
+  }
+  if(t.status==='on-hold'){
+    return {state:'hold',label:'SLA paused (on hold)',cd:'&#9646;&#9646; Paused'};
+  }
+  var elapsed=Date.now()-new Date(t.created).getTime()-holdMs;
+  var remaining=target-elapsed;
+  var pct=Math.min(100,(elapsed/target)*100);
+  if(remaining<=0){
+    var over=Math.abs(remaining);
+    return {state:'breach',label:'SLA breached by '+fmtDur(over),cd:'+'+fmtDur(over)};
+  }
+  var state=pct>=80?'warn':'ok';
+  return {state:state,label:'Due in '+fmtDur(remaining),cd:fmtDur(remaining)};
+}
+
+function slaBadge(t){
+  var i=getSLAInfo(t);
+  var cls={breach:'sla-breach',warn:'sla-warn',ok:'sla-ok',hold:'sla-hold',met:'sla-met'};
+  return '<span class="sla-badge '+(cls[i.state]||'')+'">'+i.cd+'</span>';
+}
+
+function updatePanelSLA(t){
+  var i=getSLAInfo(t);
+  var block=document.getElementById('p-sla-block');
+  block.className='sla-block '+i.state;
+  document.getElementById('p-sla-cd').innerHTML=i.cd;
+  document.getElementById('p-sla-lbl').textContent=i.label;
+}
+
+function startSLATicker(){
+  if(window._slaTick) clearInterval(window._slaTick);
+  window._slaTick=setInterval(function(){
+    var active=tickets.filter(function(t){return !t._archived;});
+    document.getElementById('s-breached').textContent=active.filter(function(t){return getSLAInfo(t).state==='breach';}).length;
+    document.querySelectorAll('#ticket-body tr[data-id]').forEach(function(row){
+      var t=getTicket(row.getAttribute('data-id'));
+      if(!t)return;
+      var sc=row.querySelector('.sla-cell');
+      if(sc) sc.innerHTML=slaBadge(t);
+      var info=getSLAInfo(t);
+      row.className=info.state==='breach'?'sla-breach':info.state==='warn'?'sla-warn':'';
+    });
+    if(openId){var t=getTicket(openId);if(t)updatePanelSLA(t);}
+  },30000);
+}
+
+/* ═══════════════════════════════════════
+   LOAD & RENDER
+═══════════════════════════════════════ */
+function loadTickets(){
+  document.getElementById('dash-date').textContent=new Date().toLocaleDateString('en-NZ',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  document.getElementById('ticket-body').innerHTML='<tr class="loading-row"><td colspan="7">Loading&hellip;</td></tr>';
+  document.getElementById('empty-state').style.display='none';
+  if(FLOW_TICKETS){
+    fetch(FLOW_TICKETS,{method:'POST'})
+    .then(function(r){if(!r.ok)throw new Error();return r.json();})
+    .then(function(items){
+      tickets=items.map(function(i){return{spId:i.ID||i.id,id:i.TicketID||('INC-'+(i.ID||i.id)),name:i.RequesterName||'',email:i.RequesterEmail||'',dept:i.Department||'',cat:i.Category||'',subject:i.Title||'',desc:i.Description||'',priority:(i.Priority||'low').toLowerCase(),status:(i.Status||'open').toLowerCase(),assignee:i.Assignee||'',notes:i.AgentNotes||'',replies:JSON.parse(i.Replies||'[]'),holdDuration:i.HoldDuration||0,holdStart:i.HoldStart||null,created:i.Created||new Date().toISOString(),closed:i.Closed||null};});
+      autoArchive();renderDash();
+    })
+    .catch(function(){document.getElementById('ticket-body').innerHTML='<tr class="loading-row"><td colspan="7">\u26A0 Could not load tickets. Check Flow URL in Settings.</td></tr>';});
+  } else {
+    try{tickets=JSON.parse(localStorage.getItem('itdesk_tickets')||'[]');}catch(e){tickets=[];}
+    var s=getStoredSettings();
+    if(!tickets.length&&s.demo!==false) tickets=JSON.parse(JSON.stringify(DEMO));
+    autoArchive();renderDash();
+  }
+}
+
+function autoArchive(){
+  var s=getStoredSettings();
+  var days=(s.archivedays||7)*86400000;
+  tickets.forEach(function(t){
+    if(t.status==='closed'&&!t.closed) t.closed=new Date().toISOString();
+    if(t.status==='closed'&&t.closed&&(Date.now()-new Date(t.closed).getTime())>days) t._archived=true;
+  });
+  saveLocal();
+}
+
+function renderDash(){
+  var active=tickets.filter(function(t){return !t._archived;});
+  document.getElementById('s-open').textContent    =active.filter(function(t){return t.status==='open';}).length;
+  document.getElementById('s-progress').textContent=active.filter(function(t){return t.status==='in-progress';}).length;
+  document.getElementById('s-hold').textContent    =active.filter(function(t){return t.status==='on-hold';}).length;
+  document.getElementById('s-resolved').textContent=active.filter(function(t){return t.status==='closed';}).length;
+  document.getElementById('s-breached').textContent=active.filter(function(t){return getSLAInfo(t).state==='breach';}).length;
+
+  var me=currentUser?(currentUser.username||'').toLowerCase():'';
+  var f=active;
+  if(activeFilter==='mine')      f=active.filter(function(t){return (t.assignee||'').toLowerCase()===me;});
+  else if(activeFilter==='unassigned') f=active.filter(function(t){return !t.assignee;});
+  else if(activeFilter==='breached')   f=active.filter(function(t){return getSLAInfo(t).state==='breach';});
+  else if(activeFilter!=='all')        f=active.filter(function(t){return t.status===activeFilter;});
+
+  // sort
+  var priOrder={critical:0,high:1,medium:2,low:3};
+  f=f.slice().sort(function(a,b){
+    var av,bv;
+    if(sortCol==='priority'){av=priOrder[a.priority]||99;bv=priOrder[b.priority]||99;}
+    else if(sortCol==='created'){av=new Date(a.created).getTime();bv=new Date(b.created).getTime();}
+    else{av=(a[sortCol]||'').toLowerCase();bv=(b[sortCol]||'').toLowerCase();}
+    if(av<bv)return-1*sortDir;if(av>bv)return sortDir;return 0;
+  });
+
+  var tbody=document.getElementById('ticket-body'); tbody.innerHTML='';
+  if(!f.length){document.getElementById('empty-state').style.display='block';return;}
+  document.getElementById('empty-state').style.display='none';
+
+  f.forEach(function(t){
+    var tr=document.createElement('tr');
+    var info=getSLAInfo(t);
+    tr.className=info.state==='breach'?'sla-breach':info.state==='warn'?'sla-warn':'';
+    tr.setAttribute('data-id',t.id);
+    var asgHtml=t.assignee
+      ?'<span class="asg-badge'+(t.assignee.toLowerCase()===me?' me':'')+'">'+esc(t.assignee.toLowerCase()===me?'Me':t.assignee.split('@')[0])+'</span>'
+      :'<span class="asg-badge">Unassigned</span>';
+    tr.innerHTML=
+      '<td class="tid">'+esc(t.id)+'</td>'+
+      '<td class="ttitle">'+esc(t.subject)+(t.replies&&t.replies.length?'<span style="color:var(--ok);margin-left:6px;font-size:10px;">\u2709 '+t.replies.length+'</span>':'')+'</td>'+
+      '<td>'+priBadge(t.priority)+'</td>'+
+      '<td>'+statusBadge(t.status)+'</td>'+
+      '<td class="sla-cell">'+slaBadge(t)+'</td>'+
+      '<td>'+asgHtml+'</td>'+
+      '<td class="tmeta">'+relTime(t.created)+'</td>';
+    (function(id){tr.onclick=function(){openPanel(id);};})(t.id);
+    tbody.appendChild(tr);
+  });
+}
+
+function setFilter(f,el){activeFilter=f;document.querySelectorAll('.chip').forEach(function(c){c.classList.remove('active');});el.classList.add('active');renderDash();}
+
+function sortBy(col){
+  if(sortCol===col) sortDir*=-1; else{sortCol=col;sortDir=1;}
+  document.querySelectorAll('#main-table th[data-col]').forEach(function(th){
+    th.classList.toggle('sorted',th.getAttribute('data-col')===col);
+    var icon=th.querySelector('.sort-icon');
+    if(icon) icon.innerHTML=th.getAttribute('data-col')===col?(sortDir===1?'&#8593;':'&#8595;'):'&#8597;';
+  });
+  renderDash();
+}
+
+/* ═══════════════════════════════════════
+   ARCHIVE
+═══════════════════════════════════════ */
+function renderArchive(){
+  var archived=tickets.filter(function(t){return t._archived;});
+  var tbody=document.getElementById('archive-body'); tbody.innerHTML='';
+  if(!archived.length){document.getElementById('archive-empty').style.display='block';return;}
+  document.getElementById('archive-empty').style.display='none';
+  archived.forEach(function(t){
+    var tr=document.createElement('tr');
+    tr.innerHTML='<td class="tid">'+esc(t.id)+'</td><td class="ttitle">'+esc(t.subject)+'</td><td>'+priBadge(t.priority)+'</td><td class="tmeta">'+(t.closed?fmtDate(t.closed):'—')+'</td><td class="tmeta">'+(t.assignee||'Unassigned')+'</td>';
+    (function(id){tr.onclick=function(){openPanel(id);};})(t.id);
+    tbody.appendChild(tr);
+  });
+}
+
+/* ═══════════════════════════════════════
+   EXPORT
+═══════════════════════════════════════ */
+function exportCSV(archive){
+  var rows=archive?tickets.filter(function(t){return t._archived;}):tickets.filter(function(t){return !t._archived;});
+  var cols=['ID','Subject','Requester','Email','Department','Category','Priority','Status','Assignee','Created','Closed','SLA','Notes'];
+  var csv=[cols.join(',')];
+  rows.forEach(function(t){
+    var info=getSLAInfo(t);
+    csv.push([t.id,'"'+(t.subject||'').replace(/"/g,'""')+'"','"'+(t.name||'').replace(/"/g,'""')+'"',t.email||'',t.dept||'',t.cat||'',t.priority,t.status,t.assignee||'',t.created||'',t.closed||'',info.label,'"'+(t.notes||'').replace(/"/g,'""')+'"'].join(','));
+  });
+  var blob=new Blob([csv.join('\n')],{type:'text/csv'});
+  var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=(archive?'archive':'tickets')+'-'+new Date().toISOString().slice(0,10)+'.csv';a.click();
+}
+
+/* ═══════════════════════════════════════
+   PANEL
+═══════════════════════════════════════ */
+function getTicket(id){for(var i=0;i<tickets.length;i++){if(tickets[i].id===id)return tickets[i];}return null;}
+
+function openPanel(id){
+  openId=id;var t=getTicket(id);if(!t)return;
+  document.getElementById('p-id').textContent    =t.id;
+  document.getElementById('p-title').textContent =t.subject;
+  document.getElementById('p-body').textContent  =t.desc;
+  document.getElementById('p-name').textContent  =t.name;
+  document.getElementById('p-email').textContent =t.email;
+  document.getElementById('p-dept').textContent  =t.dept;
+  document.getElementById('p-cat').textContent   =t.cat;
+  document.getElementById('p-notes').value       =t.notes||'';
+  document.getElementById('p-reply').value       ='';
+  document.getElementById('reply-status').textContent='';
+  document.getElementById('p-priority-sel').value=t.priority||'low';
+
+  // status select
+  var statuses=[['open','Open'],['in-progress','In Progress'],['on-hold','On Hold'],['resolved','Resolved'],['closed','Closed']];
+  var sel=document.getElementById('p-status-sel');
+  sel.innerHTML=statuses.map(function(s){return'<option value="'+s[0]+'"'+(t.status===s[0]?' selected':'')+'>'+s[1]+'</option>';}).join('');
+
+  // assignee
+  var agents=getAgents();
+  var me=(currentUser?currentUser.username:'').toLowerCase();
+  var asel=document.getElementById('p-asg-sel');
+  asel.innerHTML='<option value="">Unassigned</option>'+agents.map(function(a){var lbl=a.email.toLowerCase()===me?'Me ('+a.email+')':a.email;return'<option value="'+esc(a.email)+'"'+(t.assignee&&t.assignee.toLowerCase()===a.email.toLowerCase()?' selected':'')+'>'+esc(lbl)+'</option>';}).join('');
+
+  // pickup btn
+  var pickBtn=document.getElementById('pickup-btn');
+  pickBtn.textContent=(t.assignee&&t.assignee.toLowerCase()===me)?'\u2713 Assigned to me':'\u261D Pick up';
+
+  // delete btn — admin only
+  document.getElementById('del-btn').style.display=currentRole==='admin'?'':'none';
+
+  // replies
+  var thread=document.getElementById('reply-thread');thread.innerHTML='';
+  var replies=t.replies||[];
+  if(!replies.length){thread.innerHTML='<div style="font-size:12px;color:var(--muted)">No replies yet.</div>';}
+  else{replies.forEach(function(r){var d=document.createElement('div');d.className='rb'+(r.from==='agent'?' sent':'');d.innerHTML='<div class="rb-meta">'+(r.from==='agent'?'You (IT Support)':'Staff member')+' \u2014 '+fmtTime(r.ts)+'</div>'+esc(r.text);thread.appendChild(d);});}
+
+  updateCycleBtn(t.status);
+  updatePanelSLA(t);
+  document.getElementById('panel-ov').classList.add('open');
+  document.getElementById('panel').classList.add('open');
+}
+
+function closePanel(){document.getElementById('panel-ov').classList.remove('open');document.getElementById('panel').classList.remove('open');openId=null;}
+
+function updateCycleBtn(s){
+  var m={open:'Mark in progress','in-progress':'Put on hold','on-hold':'Resume (in progress)',resolved:'Reopen',closed:'Reopen'};
+  document.getElementById('cycle-btn').textContent=m[s]||'Mark in progress';
+}
+
+function persist(t){
+  if(FLOW_UPDATE){fetch(FLOW_UPDATE,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({spId:t.spId,status:t.status,notes:t.notes,assignee:t.assignee,replies:JSON.stringify(t.replies||[]),holdDuration:t.holdDuration||0,holdStart:t.holdStart||null})}).catch(function(){});}
+  else{saveLocal();}
+  renderDash();
+}
+
+function updatePriority(){
+  var t=getTicket(openId);if(!t)return;
+  t.priority=document.getElementById('p-priority-sel').value;
+  updatePanelSLA(t);
+  persist(t);
+}
+
+function updateStatus(){
+  var t=getTicket(openId);if(!t)return;
+  var newStatus=document.getElementById('p-status-sel').value;
+  applyStatusChange(t,newStatus);
+  updateCycleBtn(t.status);
+  updatePanelSLA(t);
+  persist(t);
+}
+
+function applyStatusChange(t,newStatus){
+  var old=t.status;
+  // handle hold tracking
+  if(old==='on-hold'&&newStatus!=='on-hold'&&t.holdStart){
+    t.holdDuration=(t.holdDuration||0)+(Date.now()-new Date(t.holdStart).getTime());
+    t.holdStart=null;
+  }
+  if(newStatus==='on-hold'&&old!=='on-hold'){
+    t.holdStart=new Date().toISOString();
+  }
+  if(newStatus==='closed'&&!t.closed) t.closed=new Date().toISOString();
+  t.status=newStatus;
+}
+
+function cycleStatus(){
+  var t=getTicket(openId);if(!t)return;
+  var cycle={open:'in-progress','in-progress':'on-hold','on-hold':'in-progress',resolved:'open',closed:'open'};
+  var next=cycle[t.status]||'in-progress';
+  applyStatusChange(t,next);
+  document.getElementById('p-status-sel').value=t.status;
+  updateCycleBtn(t.status);
+  updatePanelSLA(t);
+  persist(t);
+}
+
+function updateAssignee(){
+  var t=getTicket(openId);if(!t)return;
+  t.assignee=document.getElementById('p-asg-sel').value;
+  var me=(currentUser?currentUser.username:'').toLowerCase();
+  document.getElementById('pickup-btn').textContent=(t.assignee&&t.assignee.toLowerCase()===me)?'\u2713 Assigned to me':'\u261D Pick up';
+  persist(t);
+}
+
+function pickupTicket(){
+  var t=getTicket(openId);if(!t||!currentUser)return;
+  t.assignee=currentUser.username;
+  // auto set to in-progress when picked up
+  if(t.status==='open'){applyStatusChange(t,'in-progress');document.getElementById('p-status-sel').value='in-progress';updateCycleBtn('in-progress');updatePanelSLA(t);}
+  document.getElementById('p-asg-sel').value=currentUser.username;
+  document.getElementById('pickup-btn').textContent='\u2713 Assigned to me';
+  persist(t);
+}
+
+function saveNote(){
+  var t=getTicket(openId);if(!t)return;
+  t.notes=document.getElementById('p-notes').value;persist(t);
+  var b=event.currentTarget;b.textContent='\u2713 Saved';setTimeout(function(){b.textContent='Save notes';},1500);
+}
+
+function deleteTicket(){
+  if(currentRole!=='admin'){alert('Only administrators can delete tickets.');return;}
+  if(!confirm('Delete this ticket? Cannot be undone.'))return;
+  tickets=tickets.filter(function(x){return x.id!==openId;});
+  saveLocal();closePanel();renderDash();
+}
+
+function sendReply(){
+  var t=getTicket(openId);if(!t)return;
+  var text=document.getElementById('p-reply').value.trim();
+  if(!text){document.getElementById('reply-status').textContent='Please type a reply first.';return;}
+  var btn=document.getElementById('send-btn');btn.disabled=true;btn.textContent='Sending\u2026';
+  var r={from:'agent',text:text,ts:new Date().toISOString()};
+  if(FLOW_REPLY){
+    fetch(FLOW_REPLY,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({spId:t.spId,ticketId:t.id,subject:'Re: ['+t.id+'] '+t.subject,toEmail:t.email,toName:t.name,replyText:text})})
+    .then(function(res){if(!res.ok)throw new Error();t.replies=t.replies||[];t.replies.push(r);persist(t);openPanel(t.id);document.getElementById('reply-status').textContent='\u2713 Reply sent';})
+    .catch(function(){document.getElementById('reply-status').textContent='\u26A0 Failed. Check Flow URL in Settings.';})
+    .finally(function(){btn.disabled=false;btn.textContent='\u2709 Send reply';});
+  } else {
+    t.replies=t.replies||[];t.replies.push(r);saveLocal();openPanel(t.id);
+    document.getElementById('reply-status').textContent='\u2713 Saved (demo mode)';
+    btn.disabled=false;btn.textContent='\u2709 Send reply';
+  }
+}
+
+/* ═══════════════════════════════════════
+   SETTINGS
+═══════════════════════════════════════ */
+// getAgents — always returns the in-memory cache (set during auth). Never localStorage.
+function getAgents(){ return _agentCache || DEFAULT_AGENTS.slice(); }
+// getStoredSettings — non-security UI preferences only (SLA values, autorefresh, etc.)
+function getStoredSettings(){try{return JSON.parse(localStorage.getItem('itdesk_settings')||'{}');}catch(e){return{};}}
+
+function applyStoredSettings(){
+  // NOTE: agent/role resolution is handled separately in handleAuthSuccess → resolveAgents().
+  // This function only restores non-security UI preferences.
+  var s=getStoredSettings();
+  if(s.flowTickets)FLOW_TICKETS=s.flowTickets;
+  if(s.flowUpdate) FLOW_UPDATE =s.flowUpdate;
+  if(s.flowReply)  FLOW_REPLY  =s.flowReply;
+  if(s.autorefresh&&!window._refreshTimer) window._refreshTimer=setInterval(loadTickets,300000);
+}
+
+function loadSettingsUI(){
+  renderAgentList(getAgents());
+  var isAdmin=currentRole==='admin';
+
+  // SLA fields — admin only
+  ['s-sla-crit','s-sla-high','s-sla-med','s-sla-low'].forEach(function(id){
+    document.getElementById(id).disabled=!isAdmin;
+  });
+
+  // agent add section
+  document.getElementById('agent-add-section').style.display=isAdmin&&FLOW_AGENTS?'block':'none';
+  document.getElementById('agent-locked-msg').style.display=isAdmin?'none':'block';
+  document.getElementById('agent-source-msg').style.display=(isAdmin&&!FLOW_AGENTS)?'block':'none';
+
+  var s=getStoredSettings();
+  if(s.slaCrit)       document.getElementById('s-sla-crit').value=s.slaCrit;
+  if(s.slaHigh)       document.getElementById('s-sla-high').value=s.slaHigh;
+  if(s.slaMed)        document.getElementById('s-sla-med').value=s.slaMed;
+  if(s.slaLow)        document.getElementById('s-sla-low').value=s.slaLow;
+  if(typeof s.demo==='boolean')        document.getElementById('s-demo').checked=s.demo;
+  if(typeof s.autorefresh==='boolean') document.getElementById('s-autorefresh').checked=s.autorefresh;
+  if(s.archivedays)   document.getElementById('s-archivedays').value=s.archivedays;
+  if(s.flowTickets)   document.getElementById('s-fl-tickets').value=s.flowTickets;
+  if(s.flowUpdate)    document.getElementById('s-fl-update').value=s.flowUpdate;
+  if(s.flowReply)     document.getElementById('s-fl-reply').value=s.flowReply;
+  if(s.flowPhishing)  document.getElementById('s-fl-phishing').value=s.flowPhishing;
+  if(s.flowSyskit)    document.getElementById('s-fl-syskit').value=s.flowSyskit;
+  if(s.flowSubmit)    document.getElementById('s-fl-submit').value=s.flowSubmit;
+}
+
+function renderAgentList(agents){
+  var list=document.getElementById('agent-list');list.innerHTML='';
+  if(!agents.length){list.innerHTML='<div style="font-size:12px;color:var(--muted);">No agents configured.</div>';return;}
+  var me=(currentUser?currentUser.username:'').toLowerCase();
+  var isAdmin=currentRole==='admin';
+  agents.forEach(function(a){
+    var isMe=a.email.toLowerCase()===me;
+    var row=document.createElement('div');row.className='agent-row';
+    // Role changes go through the server (FLOW_AGENTS) or require editing DEFAULT_AGENTS in source
+    row.innerHTML=
+      '<div class="agent-email" style="flex:1;">'+esc(a.email)+'</div>'+
+      (isAdmin&&!isMe&&FLOW_AGENTS
+        ?'<select class="si" style="font-size:11px;padding:4px 8px;" onchange="changeRole(\''+esc(a.email)+'\',this.value)"><option value="agent"'+(a.role==='admin'?'':' selected')+'>Agent</option><option value="admin"'+(a.role==='admin'?' selected':'')+'>Admin</option></select>'
+        :'<span class="role-badge '+(a.role||'agent')+(isMe?' you':'')+'">'+((a.role||'agent')==='admin'?'Admin':'Agent')+(isMe?' (you)':'')+'</span>')+
+      (isAdmin&&!isMe&&FLOW_AGENTS?'<button class="rm-btn" onclick="removeAgent(\''+esc(a.email)+'\')">&#10005;</button>':'');
+    list.appendChild(row);
+  });
+}
+
+function changeRole(email,role){
+  if(currentRole!=='admin'||!FLOW_AGENTS)return;
+  var agents=getAgents();
+  var a=agents.find(function(x){return x.email.toLowerCase()===email.toLowerCase();});
+  if(a){
+    a.role=role;
+    // Persist change server-side via the agents flow
+    fetch(FLOW_AGENTS,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'update',email:email,role:role})}).catch(function(){});
+    renderAgentList(agents);
+  }
+}
+
+function addAgent(){
+  if(currentRole!=='admin'){alert('Only administrators can add agents.');return;}
+  if(!FLOW_AGENTS){alert('Set a FLOW_AGENTS URL (or edit DEFAULT_AGENTS in source) to manage agents.');return;}
+  var emailEl=document.getElementById('new-agent-email');
+  var roleEl=document.getElementById('new-agent-role');
+  var email=emailEl.value.trim().toLowerCase();
+  var role=roleEl.value||'agent';
+  var err=document.getElementById('agent-err');err.style.display='none';
+  if(!email||!email.includes('@')){err.textContent='Please enter a valid email address.';err.style.display='block';return;}
+  var agents=getAgents();
+  if(agents.find(function(a){return a.email.toLowerCase()===email;})){err.textContent='That agent is already in the list.';err.style.display='block';return;}
+  agents.push({email:email,role:role});
+  _agentCache = agents;
+  // Persist server-side via the agents flow
+  fetch(FLOW_AGENTS,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'add',email:email,role:role})}).catch(function(){});
+  renderAgentList(agents);
+  emailEl.value='';
+}
+
+function removeAgent(email){
+  if(currentRole!=='admin'){alert('Only administrators can remove agents.');return;}
+  if(!FLOW_AGENTS){alert('Set a FLOW_AGENTS URL to manage agents dynamically.');return;}
+  if(!confirm('Remove '+email+' from agent access?'))return;
+  var agents=getAgents().filter(function(a){return a.email.toLowerCase()!==email.toLowerCase();});
+  _agentCache = agents;
+  // Persist server-side via the agents flow
+  fetch(FLOW_AGENTS,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'remove',email:email})}).catch(function(){});
+  renderAgentList(agents);
+}
+
+function saveSettings(){
+  var s=getStoredSettings();
+  // SLA — admin only
+  if(currentRole==='admin'){
+    s.slaCrit =parseInt(document.getElementById('s-sla-crit').value)||1;
+    s.slaHigh =parseInt(document.getElementById('s-sla-high').value)||4;
+    s.slaMed  =parseInt(document.getElementById('s-sla-med').value)||8;
+    s.slaLow  =parseInt(document.getElementById('s-sla-low').value)||24;
+  }
+  s.demo        =document.getElementById('s-demo').checked;
+  s.autorefresh =document.getElementById('s-autorefresh').checked;
+  s.archivedays =parseInt(document.getElementById('s-archivedays').value)||7;
+  s.flowSubmit  =document.getElementById('s-fl-submit').value.trim();
+  s.flowTickets =document.getElementById('s-fl-tickets').value.trim();
+  s.flowUpdate  =document.getElementById('s-fl-update').value.trim();
+  s.flowReply   =document.getElementById('s-fl-reply').value.trim();
+  s.flowPhishing=document.getElementById('s-fl-phishing').value.trim();
+  s.flowSyskit  =document.getElementById('s-fl-syskit').value.trim();
+  localStorage.setItem('itdesk_settings',JSON.stringify(s));
+  if(s.flowTickets)FLOW_TICKETS=s.flowTickets;
+  if(s.flowUpdate) FLOW_UPDATE =s.flowUpdate;
+  if(s.flowReply)  FLOW_REPLY  =s.flowReply;
+  if(s.autorefresh){if(!window._refreshTimer)window._refreshTimer=setInterval(loadTickets,300000);}
+  else{clearInterval(window._refreshTimer);window._refreshTimer=null;}
+  var msg=document.getElementById('saved-msg');msg.style.display='inline';setTimeout(function(){msg.style.display='none';},2500);
+}
+
+/* ═══════════════════════════════════════
+   REPORTS
+═══════════════════════════════════════ */
+var activeReport = 'tickets';
+
+function showReport(key, chipEl){
+  activeReport = key;
+  document.querySelectorAll('.report-section').forEach(function(s){s.classList.remove('active');});
+  document.getElementById('rs-'+key).classList.add('active');
+  document.querySelectorAll('.filter-bar .chip[id^="rc-"]').forEach(function(c){c.classList.remove('active');});
+  if(chipEl) chipEl.classList.add('active');
+  refreshActiveReport();
+}
+
+function refreshActiveReport(){
+  document.getElementById('report-updated').textContent = 'Updated '+new Date().toLocaleTimeString('en-NZ',{hour:'2-digit',minute:'2-digit'});
+  if(activeReport==='tickets')  renderTicketReport();
+  if(activeReport==='defender') loadDefenderAlerts();
+  if(activeReport==='phishing') loadPhishingData();
+  if(activeReport==='syskit')   renderSyskitManual();
+}
+
+/* ── TICKETS REPORT ── */
+function renderTicketReport(){
+  var days = parseInt(document.getElementById('rpt-range').value)||30;
+  var now  = Date.now();
+  var cutoff = days===0 ? 0 : now - days*86400000;
+  var tickets_data = (tickets && tickets.length) ? tickets : (typeof DEMO!=='undefined'?DEMO:[]);
+  var inRange  = tickets_data.filter(function(t){ return new Date(t.created).getTime()>=cutoff; });
+  var total    = inRange.length;
+  var resolved = inRange.filter(function(t){ return t.status==='resolved'||t.status==='closed'; }).length;
+  var unassigned = inRange.filter(function(t){ return !t.assignee && (t.status==='open'||t.status==='in-progress'); }).length;
+
+  // SLA check
+  var s = getStoredSettings();
+  var slaMap = {critical:(s.slaCrit||1)*3600000,high:(s.slaHigh||4)*3600000,medium:(s.slaMed||8)*3600000,low:(s.slaLow||24)*3600000};
+  var metSla=0;
+  inRange.forEach(function(t){
+    var age=now-new Date(t.created).getTime();
+    var limit=slaMap[t.priority]||slaMap.low;
+    if(t.status==='on-hold'||age<=limit) metSla++;
+  });
+  var slaRate = total?Math.round(metSla/total*100):100;
+
+  document.getElementById('rpt-total').textContent = total;
+  document.getElementById('rpt-total-sub').textContent = (days===0?'all time':'last '+days+' days');
+  document.getElementById('rpt-resolved').textContent = resolved;
+  document.getElementById('rpt-resolved-sub').textContent = total?Math.round(resolved/total*100)+'% of total':'';
+  document.getElementById('rpt-resolved-bar').style.width = (total?Math.round(resolved/total*100):0)+'%';
+  document.getElementById('rpt-sla').textContent = slaRate+'%';
+  document.getElementById('rpt-sla-bar').style.width = slaRate+'%';
+  document.getElementById('rpt-sla-bar').className = 'rc-bar-fill'+(slaRate<70?' crit':slaRate<85?' warn':'');
+  document.getElementById('rpt-unassigned').textContent = unassigned;
+
+  // By category
+  var cats={};
+  inRange.forEach(function(t){ cats[t.cat||'Uncategorised']=(cats[t.cat||'Uncategorised']||0)+1; });
+  var catArr=Object.entries(cats).sort(function(a,b){return b[1]-a[1];});
+  var max=catArr[0]?catArr[0][1]:1;
+  document.getElementById('rpt-by-cat').innerHTML = catArr.length?catArr.map(function(e){
+    return '<div class="rp-row"><span class="rp-label">'+esc(e[0])+'</span><div class="rp-bar-wrap"><div class="rp-bar-seg" style="width:'+Math.round(e[1]/max*100)+'%"></div></div><span class="rp-val">'+e[1]+'</span></div>';
+  }).join(''):'<div style="color:var(--muted);font-size:12px;">No tickets in range</div>';
+
+  // By priority
+  var priOrder=['critical','high','medium','low'];
+  var priColors={'critical':'#b91c1c','high':'var(--accent)','medium':'var(--warn)','low':'var(--ok)'};
+  var priCounts={};
+  inRange.forEach(function(t){ priCounts[t.priority]=(priCounts[t.priority]||0)+1; });
+  var maxP=Math.max.apply(null,Object.values(priCounts).concat([1]));
+  document.getElementById('rpt-by-pri').innerHTML = priOrder.map(function(p){
+    var n=priCounts[p]||0;
+    return '<div class="rp-row"><span class="rp-label" style="text-transform:capitalize;">'+p+'</span><div class="rp-bar-wrap"><div class="rp-bar-seg" style="width:'+Math.round(n/maxP*100)+'%;background:'+priColors[p]+'"></div></div><span class="rp-val">'+n+'</span></div>';
+  }).join('');
+
+  // By agent
+  var agents={};
+  inRange.forEach(function(t){ var a=t.assignee||'Unassigned'; agents[a]=(agents[a]||0)+1; });
+  var agArr=Object.entries(agents).sort(function(a,b){return b[1]-a[1];});
+  var maxA=agArr[0]?agArr[0][1]:1;
+  document.getElementById('rpt-by-agent').innerHTML = agArr.length?agArr.map(function(e){
+    return '<div class="rp-row"><span class="rp-label">'+esc(e[0]==='Unassigned'?'Unassigned':e[0].split('@')[0])+'</span><div class="rp-bar-wrap"><div class="rp-bar-seg" style="width:'+Math.round(e[1]/maxA*100)+'%"></div></div><span class="rp-val">'+e[1]+'</span></div>';
+  }).join(''):'<div style="color:var(--muted);font-size:12px;">No tickets in range</div>';
+}
+
+/* ── DEFENDER ── */
+function loadDefenderAlerts(){
+  var badge = document.getElementById('defender-status-badge');
+  badge.textContent = '⬤ Checking…';badge.className='data-status';
+  var saved = JSON.parse(localStorage.getItem('itdesk_def_manual')||'null');
+  if(saved){ applyDefenderData(saved.high,saved.med,saved.low,saved.info,saved.alerts||[],'manual',null); }
+
+  // Try Graph API for Defender alerts
+  if(!msalInstance||!currentUser){document.getElementById('defender-config-note').style.display='block';badge.textContent='⬤ Manual';badge.className='data-status manual';return;}
+  var secScope = ['https://graph.microsoft.com/SecurityAlert.Read.All'];
+  msalInstance.acquireTokenSilent({scopes:secScope,account:currentUser}).then(function(resp){
+    return fetch('https://graph.microsoft.com/v1.0/security/alerts_v2?$top=20&$orderby=createdDateTime desc',{headers:{Authorization:'Bearer '+resp.accessToken}});
+  }).then(function(r){return r.json();}).then(function(data){
+    if(data.error){throw new Error(data.error.message);}
+    var alerts=data.value||[];
+    var h=alerts.filter(function(a){return a.severity==='high';}).length;
+    var m=alerts.filter(function(a){return a.severity==='medium';}).length;
+    var l=alerts.filter(function(a){return a.severity==='low';}).length;
+    var i=alerts.filter(function(a){return a.severity==='informational';}).length;
+    applyDefenderData(h,m,l,i,alerts,'live','via Microsoft Graph');
+    document.getElementById('defender-manual').style.display='none';
+    document.getElementById('defender-config-note').style.display='none';
+  }).catch(function(e){
+    document.getElementById('defender-config-note').style.display='block';
+    badge.textContent='⬤ Manual';badge.className='data-status manual';
+  });
+}
+
+function applyDefenderData(h,m,l,i,alerts,mode,src){
+  var badge=document.getElementById('defender-status-badge');
+  badge.textContent='⬤ '+(mode==='live'?'Live':'Manual');
+  badge.className='data-status '+(mode==='live'?'live':'manual');
+  document.getElementById('def-s-high').textContent=h;
+  document.getElementById('def-s-med').textContent=m;
+  document.getElementById('def-s-low').textContent=l;
+  document.getElementById('def-s-info').textContent=i;
+  document.getElementById('def-alerts-src').textContent=src?'· '+src:'';
+  // Render alert list
+  var list=document.getElementById('def-alert-list');
+  if(!alerts||!alerts.length){list.innerHTML='<div style="color:var(--muted);font-size:12px;padding:12px 0;">No active alerts.</div>';return;}
+  list.innerHTML=alerts.slice(0,10).map(function(a){
+    var sev=a.severity||'informational';
+    var title=a.title||a.alertDisplayName||'Alert';
+    var cat=a.category||a.serviceSource||'';
+    var ts=a.createdDateTime||a.created||'';
+    var date=ts?new Date(ts).toLocaleDateString('en-NZ',{day:'numeric',month:'short'}):'';
+    return '<div class="alert-row"><span class="alert-sev sev-'+sev+'">'+sev+'</span><div class="alert-title">'+esc(title)+'<div style="font-size:11px;color:var(--muted);font-weight:400;margin-top:2px;">'+esc(cat)+'</div></div><span class="alert-meta">'+date+'</span></div>';
+  }).join('');
+}
+
+function renderDefenderManual(){
+  var h=parseInt(document.getElementById('def-high').value)||0;
+  var m=parseInt(document.getElementById('def-med').value)||0;
+  var l=parseInt(document.getElementById('def-low').value)||0;
+  var i=parseInt(document.getElementById('def-info').value)||0;
+  document.getElementById('def-s-high').textContent=h;
+  document.getElementById('def-s-med').textContent=m;
+  document.getElementById('def-s-low').textContent=l;
+  document.getElementById('def-s-info').textContent=i;
+}
+
+function saveDefenderManual(){
+  var h=parseInt(document.getElementById('def-high').value)||0;
+  var m=parseInt(document.getElementById('def-med').value)||0;
+  var l=parseInt(document.getElementById('def-low').value)||0;
+  var i=parseInt(document.getElementById('def-info').value)||0;
+  var n=parseInt(document.getElementById('def-new').value)||0;
+  var r=parseInt(document.getElementById('def-resolved').value)||0;
+  localStorage.setItem('itdesk_def_manual',JSON.stringify({high:h,med:m,low:l,info:i,newThisWeek:n,resolvedThisWeek:r,saved:new Date().toISOString()}));
+  var msg=document.getElementById('def-saved');msg.style.display='inline';setTimeout(function(){msg.style.display='none';},2500);
+  applyDefenderData(h,m,l,i,[],'manual',null);
+  document.getElementById('def-alert-list').innerHTML='<div style="color:var(--muted);font-size:12px;padding:12px 0;">Manual mode — connect via Graph API to see individual alerts.</div>';
+}
+
+/* ── PHISHING ── */
+function loadPhishingData(){
+  var s=getStoredSettings();
+  var badge=document.getElementById('phish-status-badge');
+  var flowUrl=s.flowPhishing;
+  // Load saved manual data first
+  var saved=JSON.parse(localStorage.getItem('itdesk_ph_manual')||'null');
+  if(saved){ populatePhishingInputs(saved); renderPhishingManual(); }
+  if(!flowUrl){ document.getElementById('phishing-flow-note').style.display='block'; badge.textContent='⬤ Manual';badge.className='data-status manual'; return; }
+  badge.textContent='⬤ Fetching…';badge.className='data-status';
+  fetch(flowUrl,{method:'GET'}).then(function(r){return r.json();}).then(function(d){
+    badge.textContent='⬤ Live';badge.className='data-status live';
+    document.getElementById('phishing-flow-note').style.display='none';
+    populatePhishingInputs(d);
+    renderPhishingManual();
+  }).catch(function(){badge.textContent='⬤ Manual';badge.className='data-status manual';document.getElementById('phishing-flow-note').style.display='block';});
+}
+
+function populatePhishingInputs(d){
+  if(d.campaign) document.getElementById('ph-campaign').value=d.campaign;
+  if(d.sent!==undefined) document.getElementById('ph-sent').value=d.sent;
+  if(d.opened!==undefined) document.getElementById('ph-opened').value=d.opened;
+  if(d.clicked!==undefined) document.getElementById('ph-clicked').value=d.clicked;
+  if(d.submitted!==undefined) document.getElementById('ph-submitted').value=d.submitted;
+  if(d.reported!==undefined) document.getElementById('ph-reported').value=d.reported;
+  if(d.trained!==undefined) document.getElementById('ph-trained').value=d.trained;
+  if(d.atrisk!==undefined) document.getElementById('ph-atrisk').value=d.atrisk;
+}
+
+function renderPhishingManual(){
+  var sent=parseInt(document.getElementById('ph-sent').value)||0;
+  var opened=parseInt(document.getElementById('ph-opened').value)||0;
+  var clicked=parseInt(document.getElementById('ph-clicked').value)||0;
+  var submitted=parseInt(document.getElementById('ph-submitted').value)||0;
+  var reported=parseInt(document.getElementById('ph-reported').value)||0;
+  var trained=parseInt(document.getElementById('ph-trained').value)||0;
+  var atrisk=parseInt(document.getElementById('ph-atrisk').value)||0;
+  var campaign=document.getElementById('ph-campaign').value;
+
+  var clickRate  = sent?Math.round(clicked/sent*100):0;
+  var reportRate = sent?Math.round(reported/sent*100):0;
+  var trainedPct = sent?Math.round(trained/sent*100):0;
+
+  document.getElementById('ph-s-click').textContent   = clickRate+'%';
+  document.getElementById('ph-s-report').textContent  = reportRate+'%';
+  document.getElementById('ph-s-trained').textContent = trainedPct+'%';
+  document.getElementById('ph-s-atrisk').textContent  = atrisk+'%';
+  document.getElementById('ph-bar-click').style.width  = Math.min(clickRate,100)+'%';
+  document.getElementById('ph-bar-report').style.width = Math.min(reportRate,100)+'%';
+  document.getElementById('ph-bar-trained').style.width= Math.min(trainedPct,100)+'%';
+  document.getElementById('ph-campaign-label').textContent = campaign?'· '+campaign:'';
+
+  if(!sent){document.getElementById('ph-breakdown').innerHTML='<div style="color:var(--muted);font-size:12px;padding:12px 0;">Enter campaign data above.</div>';return;}
+  document.getElementById('ph-breakdown').innerHTML=[
+    {label:'Emails sent',val:sent,n:sent,max:sent,color:'var(--ok)'},
+    {label:'Opened email',val:opened,n:opened,max:sent,color:'var(--warn)'},
+    {label:'Clicked link',val:clicked+' ('+clickRate+'%)',n:clicked,max:sent,color:'var(--accent)'},
+    {label:'Submitted data',val:submitted,n:submitted,max:sent,color:'#b91c1c'},
+    {label:'Reported phish',val:reported+' ('+reportRate+'%)',n:reported,max:sent,color:'var(--ok)'},
+    {label:'Training completed',val:trained,n:trained,max:sent,color:'#7c3aed'},
+  ].map(function(r){
+    return '<div class="rp-row"><span class="rp-label">'+r.label+'</span><div class="rp-bar-wrap"><div class="rp-bar-seg" style="width:'+Math.round(r.n/r.max*100)+'%;background:'+r.color+'"></div></div><span class="rp-val">'+r.val+'</span></div>';
+  }).join('');
+}
+
+function savePhishingManual(){
+  var d={
+    campaign:document.getElementById('ph-campaign').value,
+    sent:parseInt(document.getElementById('ph-sent').value)||0,
+    opened:parseInt(document.getElementById('ph-opened').value)||0,
+    clicked:parseInt(document.getElementById('ph-clicked').value)||0,
+    submitted:parseInt(document.getElementById('ph-submitted').value)||0,
+    reported:parseInt(document.getElementById('ph-reported').value)||0,
+    trained:parseInt(document.getElementById('ph-trained').value)||0,
+    atrisk:parseInt(document.getElementById('ph-atrisk').value)||0,
+    saved:new Date().toISOString()
+  };
+  localStorage.setItem('itdesk_ph_manual',JSON.stringify(d));
+  var msg=document.getElementById('ph-saved');msg.style.display='inline';setTimeout(function(){msg.style.display='none';},2500);
+}
+
+/* ── SYSKIT ── */
+function renderSyskitManual(){
+  var teams=parseInt(document.getElementById('sk-teams').value)||0;
+  var teamsI=parseInt(document.getElementById('sk-teams-inactive').value)||0;
+  var groups=parseInt(document.getElementById('sk-groups').value)||0;
+  var orphaned=parseInt(document.getElementById('sk-orphaned').value)||0;
+  var users=parseInt(document.getElementById('sk-users').value)||0;
+  var guests=parseInt(document.getElementById('sk-guests').value)||0;
+  var inactive=parseInt(document.getElementById('sk-inactive').value)||0;
+  var shared=parseInt(document.getElementById('sk-shared').value)||0;
+  var anon=parseInt(document.getElementById('sk-anon').value)||0;
+  var ext=parseInt(document.getElementById('sk-ext').value)||0;
+  var storage=parseFloat(document.getElementById('sk-storage').value)||0;
+  var storageTotal=parseFloat(document.getElementById('sk-storage-total').value)||0;
+
+  document.getElementById('sk-s-teams').textContent=teams;
+  document.getElementById('sk-s-teams-sub').textContent=teamsI?teamsI+' inactive':'';
+  document.getElementById('sk-s-guests').textContent=guests;
+  document.getElementById('sk-s-anon').textContent=anon;
+  var storagePct=storageTotal?Math.round(storage/storageTotal*100):0;
+  document.getElementById('sk-s-storage').textContent=storage+'GB';
+  document.getElementById('sk-s-storage-sub').textContent=storageTotal?'of '+storageTotal+'GB ('+storagePct+'%)':'';
+  document.getElementById('sk-bar-storage').style.width=storagePct+'%';
+  document.getElementById('sk-bar-storage').className='rc-bar-fill'+(storagePct>85?' crit':storagePct>70?' warn':'');
+
+  // Teams breakdown
+  document.getElementById('sk-teams-breakdown').innerHTML=[
+    {label:'Active Teams',val:teams,color:'var(--ok)'},
+    {label:'Inactive Teams',val:teamsI,color:'var(--warn)'},
+    {label:'M365 Groups',val:groups,color:'var(--muted)'},
+    {label:'Orphaned (no owner)',val:orphaned,color:'#b91c1c'},
+  ].map(function(r){return '<div class="rp-row"><span class="rp-label">'+r.label+'</span><span class="rp-val" style="color:'+r.color+'">'+r.val+'</span></div>';}).join('');
+
+  // Users breakdown
+  document.getElementById('sk-users-breakdown').innerHTML=[
+    {label:'Licensed users',val:users},
+    {label:'Guest users',val:guests,color:'var(--warn)'},
+    {label:'Inactive (90+ days)',val:inactive,color:'var(--accent)'},
+    {label:'Shared mailboxes',val:shared},
+  ].map(function(r){return '<div class="rp-row"><span class="rp-label">'+r.label+'</span><span class="rp-val"'+(r.color?' style="color:'+r.color+'"':'')+'>'+r.val+'</span></div>';}).join('');
+
+  // Sharing risks
+  document.getElementById('sk-sharing-breakdown').innerHTML=[
+    {label:'Anonymous sharing links',val:anon,color:anon>0?'#b91c1c':'var(--ok)',note:'Anyone with link'},
+    {label:'External sharing links',val:ext,color:ext>0?'var(--warn)':'var(--ok)',note:'Outside organisation'},
+    {label:'Storage used',val:storage+'GB / '+(storageTotal||'?')+'GB',color:'var(--ink)'},
+    {label:'Orphaned workspaces',val:orphaned,color:orphaned>0?'var(--accent)':'var(--ok)',note:'No active owner'},
+  ].map(function(r){return '<div class="rp-row"><span class="rp-label">'+r.label+(r.note?'<span style="color:var(--muted);font-size:10px;margin-left:6px;">'+r.note+'</span>':'')+'</span><span class="rp-val" style="color:'+r.color+'">'+r.val+'</span></div>';}).join('');
+}
+
+function saveSyskitManual(){
+  var d={};
+  ['sk-teams','sk-teams-inactive','sk-groups','sk-orphaned','sk-users','sk-guests','sk-inactive','sk-shared','sk-anon','sk-ext','sk-storage','sk-storage-total'].forEach(function(id){d[id]=document.getElementById(id).value;});
+  d.saved=new Date().toISOString();
+  localStorage.setItem('itdesk_sk_manual',JSON.stringify(d));
+  var msg=document.getElementById('sk-saved');msg.style.display='inline';setTimeout(function(){msg.style.display='none';},2500);
+}
+
+function loadSyskitSaved(){
+  var d=JSON.parse(localStorage.getItem('itdesk_sk_manual')||'null');
+  if(!d)return;
+  ['sk-teams','sk-teams-inactive','sk-groups','sk-orphaned','sk-users','sk-guests','sk-inactive','sk-shared','sk-anon','sk-ext','sk-storage','sk-storage-total'].forEach(function(id){if(d[id]!==undefined)document.getElementById(id).value=d[id];});
+  renderSyskitManual();
+}
+
+function loadDefenderSaved(){
+  var d=JSON.parse(localStorage.getItem('itdesk_def_manual')||'null');
+  if(!d)return;
+  document.getElementById('def-high').value=d.high||0;
+  document.getElementById('def-med').value=d.med||0;
+  document.getElementById('def-low').value=d.low||0;
+  document.getElementById('def-info').value=d.info||0;
+  document.getElementById('def-new').value=d.newThisWeek||0;
+  document.getElementById('def-resolved').value=d.resolvedThisWeek||0;
+  applyDefenderData(d.high||0,d.med||0,d.low||0,d.info||0,[],'manual',null);
+}
+
+function loadPhishingSaved(){
+  var d=JSON.parse(localStorage.getItem('itdesk_ph_manual')||'null');
+  if(!d)return;
+  populatePhishingInputs(d);
+  renderPhishingManual();
+}
+
+/* ── Extend saveSettings to include report flows ── */
+var _origSaveSettings = typeof saveSettings==='function'?saveSettings:null;
+
+/* ═══════════════════════════════════════
+   EXPORT
+═══════════════════════════════════════ */
+function toggleExportMenu(){
+  var m=document.getElementById('export-menu');
+  m.style.display=m.style.display==='none'?'block':'none';
+}
+document.addEventListener('click',function(e){
+  var wrap=document.getElementById('export-wrap');
+  if(wrap&&!wrap.contains(e.target)) document.getElementById('export-menu').style.display='none';
+});
+
+function getReportDate(){ return new Date().toLocaleDateString('en-NZ',{day:'numeric',month:'long',year:'numeric'}); }
+function getOrgName(){ return 'Te Rito Maioha'; }
+
+function getDefenderData(){
+  return{
+    high:parseInt(document.getElementById('def-s-high').textContent)||0,
+    med:parseInt(document.getElementById('def-s-med').textContent)||0,
+    low:parseInt(document.getElementById('def-s-low').textContent)||0,
+    info:parseInt(document.getElementById('def-s-info').textContent)||0
+  };
+}
+function getPhishingData(){
+  return{
+    campaign:document.getElementById('ph-campaign').value||'—',
+    sent:parseInt(document.getElementById('ph-sent').value)||0,
+    opened:parseInt(document.getElementById('ph-opened').value)||0,
+    clicked:parseInt(document.getElementById('ph-clicked').value)||0,
+    submitted:parseInt(document.getElementById('ph-submitted').value)||0,
+    reported:parseInt(document.getElementById('ph-reported').value)||0,
+    trained:parseInt(document.getElementById('ph-trained').value)||0,
+    atrisk:parseInt(document.getElementById('ph-atrisk').value)||0
+  };
+}
+function getSyskitData(){
+  return{
+    teams:parseInt(document.getElementById('sk-teams').value)||0,
+    teamsInactive:parseInt(document.getElementById('sk-teams-inactive').value)||0,
+    groups:parseInt(document.getElementById('sk-groups').value)||0,
+    orphaned:parseInt(document.getElementById('sk-orphaned').value)||0,
+    users:parseInt(document.getElementById('sk-users').value)||0,
+    guests:parseInt(document.getElementById('sk-guests').value)||0,
+    inactive:parseInt(document.getElementById('sk-inactive').value)||0,
+    shared:parseInt(document.getElementById('sk-shared').value)||0,
+    anon:parseInt(document.getElementById('sk-anon').value)||0,
+    ext:parseInt(document.getElementById('sk-ext').value)||0,
+    storage:parseFloat(document.getElementById('sk-storage').value)||0,
+    storageTotal:parseFloat(document.getElementById('sk-storage-total').value)||0
+  };
+}
+
+/* ── PDF ── */
+function exportReportPDF(scope){
+  document.getElementById('export-menu').style.display='none';
+  var sections=scope==='active'?[activeReport]:['tickets','defender','phishing','syskit'];
+  var parts=[];
+  sections.forEach(function(s){
+    if(s==='tickets')  parts.push(buildTicketsPDFSection());
+    if(s==='defender') parts.push(buildDefenderPDFSection());
+    if(s==='phishing') parts.push(buildPhishingPDFSection());
+    if(s==='syskit')   parts.push(buildSyskitPDFSection());
+  });
+  var date=getReportDate(); var org=getOrgName();
+  var sectionNames=sections.map(function(s){return{'tickets':'Helpdesk Tickets','defender':'Microsoft Defender','phishing':'Phriendly Phishing','syskit':'Syskit M365 Governance'}[s];});
+  var html='<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/><title>IT Report — '+org+' — '+date+'</title><style>'+
+    '*{box-sizing:border-box;margin:0;padding:0;}body{font-family:Georgia,serif;font-size:12pt;color:#111;background:#fff;}'+
+    '@page{size:A4;margin:20mm 18mm;}'+
+    '.cover{padding:30mm 0 20mm;border-bottom:3px solid #c94f2c;margin-bottom:10mm;}'+
+    '.cover .org{font-size:13pt;color:#c94f2c;font-weight:bold;font-family:monospace;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6pt;}'+
+    '.cover h1{font-size:26pt;font-weight:normal;letter-spacing:-.02em;margin-bottom:8pt;}'+
+    '.cover .scope{font-size:12pt;color:#555;line-height:1.8;margin-bottom:10pt;}'+
+    '.cover .date{font-size:10pt;color:#999;font-family:monospace;}'+
+    '.section{padding:8mm 0;}.section+.section{border-top:2px solid #eee;margin-top:6mm;padding-top:8mm;}'+
+    'h2{font-size:15pt;font-weight:normal;color:#c94f2c;margin-bottom:5mm;letter-spacing:-.01em;}'+
+    'h3{font-size:9pt;text-transform:uppercase;letter-spacing:.1em;color:#888;margin:5mm 0 3mm;font-family:monospace;}'+
+    '.kpi-row{display:flex;gap:5mm;margin-bottom:5mm;}'+
+    '.kpi{flex:1;background:#f9f7f3;border:1px solid #e0dbd4;border-left:3px solid #c94f2c;padding:3.5mm 4.5mm;border-radius:2px;}'+
+    '.kpi.ok{border-left-color:#2a7c5f;}.kpi.warn{border-left-color:#c47d1a;}.kpi.crit{border-left-color:#b91c1c;}'+
+    '.kv{font-size:19pt;font-weight:bold;line-height:1;}.kl{font-size:8pt;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-top:1.5mm;font-family:monospace;}'+
+    'table{width:100%;border-collapse:collapse;margin-bottom:4mm;font-size:10pt;}'+
+    'th{font-size:8pt;text-transform:uppercase;letter-spacing:.06em;color:#888;text-align:left;padding:2mm 3mm;border-bottom:1.5px solid #333;font-family:monospace;font-weight:normal;}'+
+    'td{padding:2.5mm 3mm;border-bottom:1px solid #e8e3d8;vertical-align:top;}tr:last-child td{border-bottom:none;}'+
+    '.ok{color:#2a7c5f;}.warn{color:#c47d1a;}.crit{color:#b91c1c;}'+
+    '.bar-bg{background:#e8e3d8;height:5px;border-radius:3px;overflow:hidden;min-width:60px;}'+
+    '.bar-fill{height:100%;border-radius:3px;background:#2a7c5f;}'+
+    '.footer{margin-top:8mm;padding-top:3mm;border-top:1px solid #ddd;font-size:8pt;color:#aaa;font-family:monospace;display:flex;justify-content:space-between;}'+
+    '@media print{@page{margin:15mm 14mm;}}'+
+    '</style></head><body>'+
+    '<div class="cover"><div class="org">'+org+'</div><h1>IT Report</h1>'+
+    '<div class="scope">'+sectionNames.join(' &nbsp;·&nbsp; ')+'</div>'+
+    '<div class="date">Prepared '+date+'</div></div>'+
+    parts.join('')+
+    '<div class="footer"><span>'+org+' — Confidential</span><span>'+date+'</span></div>'+
+    '</body></html>';
+  var win=window.open('','_blank');
+  win.document.write(html);win.document.close();win.focus();
+  setTimeout(function(){win.print();},700);
+}
+
+function buildTicketsPDFSection(){
+  var days=parseInt(document.getElementById('rpt-range').value)||30;
+  var now=Date.now(); var cutoff=days===0?0:now-days*86400000;
+  var all=(tickets&&tickets.length)?tickets:(typeof DEMO!=='undefined'?DEMO:[]);
+  var t=all.filter(function(x){return new Date(x.created).getTime()>=cutoff;});
+  var total=t.length;
+  var resolved=t.filter(function(x){return x.status==='resolved'||x.status==='closed';}).length;
+  var open=t.filter(function(x){return x.status==='open';}).length;
+  var s=getStoredSettings();
+  var slaMap={critical:(s.slaCrit||1)*3600000,high:(s.slaHigh||4)*3600000,medium:(s.slaMed||8)*3600000,low:(s.slaLow||24)*3600000};
+  var metSla=0;
+  t.forEach(function(x){if(x.status==='on-hold'||now-new Date(x.created).getTime()<=slaMap[x.priority]) metSla++;});
+  var slaRate=total?Math.round(metSla/total*100):100;
+  var cats={}; t.forEach(function(x){cats[x.cat||'Uncategorised']=(cats[x.cat||'Uncategorised']||0)+1;});
+  var catRows=Object.entries(cats).sort(function(a,b){return b[1]-a[1];}).map(function(e){
+    var pct=total?Math.round(e[1]/total*100):0;
+    return '<tr><td>'+e[0]+'</td><td style="width:40%;"><div class="bar-bg"><div class="bar-fill" style="width:'+pct+'%"></div></div></td><td>'+e[1]+' <span style="color:#999;font-size:9pt;">('+pct+'%)</span></td></tr>';
+  }).join('');
+  return '<div class="section"><h2>Helpdesk Tickets <span style="font-size:11pt;color:#999;">'+(days===0?'All time':'Last '+days+' days')+'</span></h2>'+
+    '<div class="kpi-row">'+
+      '<div class="kpi"><div class="kv">'+total+'</div><div class="kl">Total</div></div>'+
+      '<div class="kpi ok"><div class="kv">'+resolved+'</div><div class="kl">Resolved</div></div>'+
+      '<div class="kpi '+(slaRate>=85?'ok':slaRate>=70?'warn':'crit')+'"><div class="kv">'+slaRate+'%</div><div class="kl">SLA compliance</div></div>'+
+      '<div class="kpi"><div class="kv">'+open+'</div><div class="kl">Open now</div></div>'+
+    '</div>'+
+    '<h3>By category</h3><table><thead><tr><th>Category</th><th>Volume</th><th>Count</th></tr></thead><tbody>'+catRows+'</tbody></table></div>';
+}
+
+function buildDefenderPDFSection(){
+  var d=getDefenderData(); var total=d.high+d.med+d.low+d.info;
+  return '<div class="section"><h2>Microsoft Defender</h2>'+
+    '<div class="kpi-row">'+
+      '<div class="kpi crit"><div class="kv">'+d.high+'</div><div class="kl">High</div></div>'+
+      '<div class="kpi warn"><div class="kv">'+d.med+'</div><div class="kl">Medium</div></div>'+
+      '<div class="kpi ok"><div class="kv">'+d.low+'</div><div class="kl">Low</div></div>'+
+      '<div class="kpi"><div class="kv">'+d.info+'</div><div class="kl">Informational</div></div>'+
+    '</div>'+
+    '<table><thead><tr><th>Severity</th><th>Alerts</th><th>Status</th></tr></thead><tbody>'+
+      '<tr><td>High</td><td>'+d.high+'</td><td class="'+(d.high>0?'crit':'ok')+'">'+(d.high>0?'Action required':'Clear')+'</td></tr>'+
+      '<tr><td>Medium</td><td>'+d.med+'</td><td class="'+(d.med>0?'warn':'ok')+'">'+(d.med>0?'Review needed':'Clear')+'</td></tr>'+
+      '<tr><td>Low</td><td>'+d.low+'</td><td class="ok">'+(d.low>0?'Monitor':'Clear')+'</td></tr>'+
+      '<tr><td>Informational</td><td>'+d.info+'</td><td style="color:#999;">Awareness</td></tr>'+
+      '<tr><td><strong>Total</strong></td><td><strong>'+total+'</strong></td><td></td></tr>'+
+    '</tbody></table></div>';
+}
+
+function buildPhishingPDFSection(){
+  var d=getPhishingData();
+  var clickRate=d.sent?Math.round(d.clicked/d.sent*100):0;
+  var reportRate=d.sent?Math.round(d.reported/d.sent*100):0;
+  var trainedPct=d.sent?Math.round(d.trained/d.sent*100):0;
+  return '<div class="section"><h2>Phriendly Phishing <span style="font-size:11pt;color:#999;">'+d.campaign+'</span></h2>'+
+    '<div class="kpi-row">'+
+      '<div class="kpi '+(clickRate<=5?'ok':clickRate<=15?'warn':'crit')+'"><div class="kv">'+clickRate+'%</div><div class="kl">Click rate</div></div>'+
+      '<div class="kpi '+(reportRate>=20?'ok':'warn')+'"><div class="kv">'+reportRate+'%</div><div class="kl">Report rate</div></div>'+
+      '<div class="kpi '+(trainedPct>=80?'ok':trainedPct>=50?'warn':'crit')+'"><div class="kv">'+trainedPct+'%</div><div class="kl">Training done</div></div>'+
+      '<div class="kpi '+(d.atrisk<=10?'ok':d.atrisk<=25?'warn':'crit')+'"><div class="kv">'+d.atrisk+'%</div><div class="kl">At risk</div></div>'+
+    '</div>'+
+    '<table><thead><tr><th>Metric</th><th>Count</th><th>% of sent</th></tr></thead><tbody>'+
+      '<tr><td>Emails sent</td><td>'+d.sent+'</td><td>—</td></tr>'+
+      '<tr><td>Opened email</td><td>'+d.opened+'</td><td>'+( d.sent?Math.round(d.opened/d.sent*100):0)+'%</td></tr>'+
+      '<tr><td>Clicked link ⚠</td><td>'+d.clicked+'</td><td class="'+(clickRate<=5?'ok':clickRate<=15?'warn':'crit')+'">'+clickRate+'%</td></tr>'+
+      '<tr><td>Submitted data ⚠</td><td>'+d.submitted+'</td><td class="'+(d.submitted>0?'crit':'ok')+'">'+( d.sent?Math.round(d.submitted/d.sent*100):0)+'%</td></tr>'+
+      '<tr><td>Reported phish ✓</td><td>'+d.reported+'</td><td class="ok">'+reportRate+'%</td></tr>'+
+      '<tr><td>Training completed ✓</td><td>'+d.trained+'</td><td class="'+(trainedPct>=80?'ok':trainedPct>=50?'warn':'crit')+'">'+trainedPct+'%</td></tr>'+
+    '</tbody></table></div>';
+}
+
+function buildSyskitPDFSection(){
+  var d=getSyskitData(); var storagePct=d.storageTotal?Math.round(d.storage/d.storageTotal*100):0;
+  return '<div class="section"><h2>Syskit — M365 Governance</h2>'+
+    '<div class="kpi-row">'+
+      '<div class="kpi"><div class="kv">'+d.teams+'</div><div class="kl">Active Teams</div></div>'+
+      '<div class="kpi '+(d.guests>0?'warn':'ok')+'"><div class="kv">'+d.guests+'</div><div class="kl">Guest users</div></div>'+
+      '<div class="kpi '+(d.anon>0?'crit':'ok')+'"><div class="kv">'+d.anon+'</div><div class="kl">Anon links</div></div>'+
+      '<div class="kpi '+(storagePct>85?'crit':storagePct>70?'warn':'ok')+'"><div class="kv">'+storagePct+'%</div><div class="kl">Storage used</div></div>'+
+    '</div>'+
+    '<table><thead><tr><th>Area</th><th>Metric</th><th>Value</th><th>Status</th></tr></thead><tbody>'+
+      '<tr><td>Teams &amp; Groups</td><td>Active</td><td>'+d.teams+'</td><td class="ok">Good</td></tr>'+
+      '<tr><td></td><td>Inactive</td><td>'+d.teamsInactive+'</td><td class="'+(d.teamsInactive>0?'warn':'ok')+'">'+(d.teamsInactive>0?'Review':'Clear')+'</td></tr>'+
+      '<tr><td></td><td>Orphaned</td><td>'+d.orphaned+'</td><td class="'+(d.orphaned>0?'crit':'ok')+'">'+(d.orphaned>0?'Action required':'Clear')+'</td></tr>'+
+      '<tr><td>Users</td><td>Licensed</td><td>'+d.users+'</td><td>—</td></tr>'+
+      '<tr><td></td><td>Guests</td><td>'+d.guests+'</td><td class="'+(d.guests>0?'warn':'ok')+'">'+(d.guests>0?'Monitor':'Clear')+'</td></tr>'+
+      '<tr><td></td><td>Inactive (90+ days)</td><td>'+d.inactive+'</td><td class="'+(d.inactive>0?'warn':'ok')+'">'+(d.inactive>0?'Review':'Clear')+'</td></tr>'+
+      '<tr><td>Sharing</td><td>Anonymous links</td><td>'+d.anon+'</td><td class="'+(d.anon>0?'crit':'ok')+'">'+(d.anon>0?'Action required':'Clear')+'</td></tr>'+
+      '<tr><td></td><td>External links</td><td>'+d.ext+'</td><td class="'+(d.ext>0?'warn':'ok')+'">'+(d.ext>0?'Monitor':'Clear')+'</td></tr>'+
+      '<tr><td>Storage</td><td>Used / Total</td><td>'+d.storage+'GB / '+(d.storageTotal||'?')+'GB</td><td class="'+(storagePct>85?'crit':storagePct>70?'warn':'ok')+'">'+storagePct+'%</td></tr>'+
+    '</tbody></table></div>';
+}
+
+/* ── CSV ── */
+function exportReportCSV(scope){
+  document.getElementById('export-menu').style.display='none';
+  var sections=scope==='active'?[activeReport]:['tickets','defender','phishing','syskit'];
+  var rows=[];
+  var date=getReportDate();
+  rows.push(['Report Date',date]);rows.push(['Organisation',getOrgName()]);rows.push([]);
+  sections.forEach(function(s){
+    if(s==='tickets'){
+      var days=parseInt(document.getElementById('rpt-range').value)||30;
+      var now=Date.now(); var cutoff=days===0?0:now-days*86400000;
+      var all=(tickets&&tickets.length)?tickets:(typeof DEMO!=='undefined'?DEMO:[]);
+      var t=all.filter(function(x){return new Date(x.created).getTime()>=cutoff;});
+      rows.push(['=== HELPDESK TICKETS (Last '+days+' days) ===']);
+      rows.push(['ID','Subject','Requester','Dept','Category','Priority','Status','Assignee','Submitted']);
+      t.forEach(function(x){rows.push([x.id,x.subject,x.name,x.dept,x.cat,x.priority,x.status,x.assignee||'Unassigned',new Date(x.created).toLocaleDateString('en-NZ')]);});
+      rows.push([]);
+    }
+    if(s==='defender'){
+      var d=getDefenderData();
+      rows.push(['=== MICROSOFT DEFENDER ===']);
+      rows.push(['Severity','Active alerts','Status']);
+      rows.push(['High',d.high,d.high>0?'Action required':'Clear']);
+      rows.push(['Medium',d.med,d.med>0?'Review needed':'Clear']);
+      rows.push(['Low',d.low,d.low>0?'Monitor':'Clear']);
+      rows.push(['Informational',d.info,'Awareness']);
+      rows.push(['Total',d.high+d.med+d.low+d.info,'']);
+      rows.push([]);
+    }
+    if(s==='phishing'){
+      var d=getPhishingData();
+      var sent=d.sent;
+      rows.push(['=== PHRIENDLY PHISHING — '+d.campaign+' ===']);
+      rows.push(['Metric','Count','% of sent']);
+      rows.push(['Emails sent',sent,'100%']);
+      rows.push(['Opened email',d.opened,(sent?Math.round(d.opened/sent*100):0)+'%']);
+      rows.push(['Clicked link',d.clicked,(sent?Math.round(d.clicked/sent*100):0)+'%']);
+      rows.push(['Submitted data',d.submitted,(sent?Math.round(d.submitted/sent*100):0)+'%']);
+      rows.push(['Reported phish',d.reported,(sent?Math.round(d.reported/sent*100):0)+'%']);
+      rows.push(['Training completed',d.trained,(sent?Math.round(d.trained/sent*100):0)+'%']);
+      rows.push(['At risk (%)',d.atrisk+'%','']);
+      rows.push([]);
+    }
+    if(s==='syskit'){
+      var d=getSyskitData();
+      rows.push(['=== SYSKIT — M365 GOVERNANCE ===']);
+      rows.push(['Metric','Value']);
+      rows.push(['Active Teams',d.teams]);rows.push(['Inactive Teams',d.teamsInactive]);
+      rows.push(['M365 Groups',d.groups]);rows.push(['Orphaned workspaces',d.orphaned]);
+      rows.push(['Licensed users',d.users]);rows.push(['Guest users',d.guests]);
+      rows.push(['Inactive users (90+ days)',d.inactive]);rows.push(['Shared mailboxes',d.shared]);
+      rows.push(['Anonymous sharing links',d.anon]);rows.push(['External sharing links',d.ext]);
+      rows.push(['Storage used (GB)',d.storage]);rows.push(['Storage total (GB)',d.storageTotal]);
+      rows.push([]);
+    }
+  });
+  var csv=rows.map(function(r){return r.map(function(c){var sv=String(c===undefined||c===null?'':c);return sv.includes(',')||sv.includes('"')||sv.includes('\n')?'"'+sv.replace(/"/g,'""')+'"':sv;}).join(',');}).join('\r\n');
+  var blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');a.href=url;
+  a.download='IT-Report-'+(scope==='active'?activeReport:'all-sections')+'-'+new Date().toISOString().slice(0,10)+'.csv';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+}
+
+var DEMO=[
+  {id:'INC-0001',spId:1,name:'Aroha Tuohoe', email:'aroha@example.com',  dept:'Academic',       cat:'Email / Outlook',       subject:'Cannot send emails — relay error', desc:'Error 5.7.57 externally. Started after password change.',  priority:'high',    status:'open',       assignee:'',notes:'',replies:[],holdDuration:0,holdStart:null,created:new Date(Date.now()-172800000).toISOString(),closed:null},
+  {id:'INC-0002',spId:2,name:'James Piripi', email:'james@example.com',  dept:'Administration', cat:'Device / Hardware',     subject:'Laptop will not power on',        desc:'Unresponsive. Was working Friday. Adapter fine.',         priority:'critical',status:'in-progress',assignee:'itadmin@example.com',notes:'Battery ordered.',replies:[{from:'agent',text:'Battery ordered, arriving Thursday.',ts:new Date(Date.now()-86400000).toISOString()}],holdDuration:0,holdStart:null,created:new Date(Date.now()-90000000).toISOString(),closed:null},
+  {id:'INC-0003',spId:3,name:'Mere Whaanga', email:'mere@example.com',   dept:'Finance',        cat:'Account / Access',      subject:'Locked out of SharePoint',        desc:'Access denied on Finance intranet. Had access last week.', priority:'medium',  status:'on-hold',    assignee:'',notes:'Waiting on access review from manager.',replies:[],holdDuration:0,holdStart:new Date(Date.now()-3600000).toISOString(),created:new Date(Date.now()-36000000).toISOString(),closed:null},
+  {id:'INC-0004',spId:4,name:'Hemi Tuohoe',  email:'hemi@example.com',   dept:'HR',             cat:'Microsoft 365 / Teams', subject:'Teams calls drop after 2 mins',   desc:'Video calls disconnect. Audio calls fine.',               priority:'medium',  status:'resolved',   assignee:'itadmin@example.com',notes:'Cleared Teams cache.',replies:[],holdDuration:0,holdStart:null,created:new Date(Date.now()-345600000).toISOString(),closed:null},
+  {id:'INC-0005',spId:5,name:'Ngahuia Rei',  email:'ngahuia@example.com',dept:'Operations',     cat:'Printer / Peripheral',  subject:'Printer on Level 2 offline',      desc:'HP LaserJet Pro offline for everyone on L2.',             priority:'low',     status:'open',       assignee:'',notes:'',replies:[],holdDuration:0,holdStart:null,created:new Date(Date.now()-7200000).toISOString(),closed:null}
+];
+</script>
+</body>
+</html>
