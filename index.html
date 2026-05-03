@@ -183,7 +183,7 @@ function submitTicket() {
   }
 
   var ticket = {
-    id: genId(), name: name, email: email, dept: dept,
+    id: 'PENDING', name: name, email: email, dept: dept,
     cat: cat, subject: subject, desc: desc,
     priority: selectedPriority, status: 'open',
     notes: '', replies: [], created: new Date().toISOString()
