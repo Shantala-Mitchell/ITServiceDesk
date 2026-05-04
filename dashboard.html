@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src https://graph.microsoft.com https://login.microsoftonline.com https://*.logic.azure.com https://*.azure.com https://*.powerplatform.com https://*.api.powerplatform.com https://*.environment.api.powerplatform.com https://default21827f8a.a9.environment.api.powerplatform.com; img-src 'self' data:;"/>
+<title>IT Service Desk — Agent Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.14.0/lib/msal-browser.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,wght@0,300;0,600;1,300&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --ink:#0f1117;--paper:#f5f2eb;--mid:#e8e3d8;
+  --rule:#d4cdc0;--accent:#c94f2c;--ok:#2a7c5f;
+  --warn:#c47d1a;--muted:#7a7469;--tag:#ede9e0;
+}
+body{font-family:'DM Mono',monospace;background:var(--paper);color:var(--ink);min-height:100vh;font-size:13px;}
+nav{display:flex;align-items:center;border-bottom:2px solid var(--ink);background:var(--ink);padding:0 24px;gap:4px;flex-wrap:wrap;}
+.nav-brand{font-family:'Fraunces',serif;font-size:18px;font-weight:600;color:var(--paper);letter-spacing:-.03em;padding:14px 0;margin-right:16px;}
+.nav-brand span{color:var(--accent);}
+.nav-btn{background:none;border:none;color:#7a7469;font-family:'DM Mono',monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;padding:16px 14px;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;transition:color .15s;}
+.nav-btn:hover{color:var(--paper);}
+.nav-btn.active{color:var(--accent);border-bottom-color:var(--accent);}
+.nav-spacer{flex:1;}
+.nav-user{color:#aaa;font-size:11px;display:flex;align-items:center;gap:10px;padding:0 4px;}
+.nav-role{font-size:10px;letter-spacing:.08em;text-transform:uppercase;padding:2px 8px;border-radius:100px;background:#2a2f42;color:#aaa;}
+.nav-role.admin{background:#3d2a0a;color:#fbbf24;}
+.sign-out-btn{background:none;border:1px solid #444;color:#aaa;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;padding:4px 10px;border-radius:3px;cursor:pointer;transition:all .15s;}
+.sign-out-btn:hover{border-color:var(--accent);color:var(--accent);}
+.auth-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;gap:20px;text-align:center;padding:24px;}
+.auth-wrap h2{font-family:'Fraunces',serif;font-size:28px;font-weight:300;}
+.auth-wrap p{color:var(--muted);font-size:12px;max-width:340px;line-height:1.8;}
+.ms-btn{display:inline-flex;align-items:center;gap:12px;background:#fff;border:1.5px solid var(--rule);padding:13px 28px;border-radius:3px;cursor:pointer;font-family:'DM Mono',monospace;font-size:13px;font-weight:500;transition:all .15s;}
+.ms-btn:hover{border-color:var(--ink);box-shadow:0 2px 10px rgba(0,0,0,.1);}
+.auth-err{color:var(--accent);font-size:12px;background:#fef2f2;border:1px solid #fca5a5;padding:10px 16px;border-radius:3px;max-width:380px;line-height:1.6;display:none;}
+.page{display:none;padding:32px 24px;max-width:980px;margin:0 auto;}
+.page.active{display:block;}
+.banner{background:#fef3c7;border:1.5px solid #fbbf24;border-radius:4px;padding:12px 16px;margin-bottom:20px;font-size:12px;line-height:1.6;color:#92400e;}
+.banner strong{display:block;margin-bottom:2px;}
+.ph{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px;}
+.ph h1{font-family:'Fraunces',serif;font-size:26px;font-weight:300;letter-spacing:-.02em;}
+.pa{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.btn{padding:7px 14px;border-radius:3px;font-family:'DM Mono',monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;border:1.5px solid var(--rule);background:#fff;transition:all .15s;white-space:nowrap;}
+.btn:hover{border-color:var(--ink);background:var(--ink);color:var(--paper);}
+.btn.pri{background:var(--ink);color:var(--paper);border-color:var(--ink);}
+.btn.pri:hover{background:var(--accent);border-color:var(--accent);}
+.btn.ok{background:var(--ok);color:#fff;border-color:var(--ok);}
+.btn.ok:hover{background:#1f6347;border-color:#1f6347;}
+.btn.danger{color:#b91c1c;border-color:#fca5a5;}
+.btn.danger:hover{background:#b91c1c;border-color:#b91c1c;color:#fff;}
+.btn:disabled{opacity:.5;cursor:not-allowed;}
+.btn.sm{padding:4px 10px;font-size:10px;}
+.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:24px;min-width:0;}
+.sc{background:#fff;border:1.5px solid var(--rule);border-radius:4px;padding:12px 14px;position:relative;overflow:hidden;min-width:0;}
+.sc::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent);}
+.sc.ok::before{background:var(--ok);}.sc.warn::before{background:var(--warn);}.sc.crit::before{background:#b91c1c;}.sc.hold::before{background:#7c3aed;}
+.sn{font-size:28px;font-family:'Fraunces',serif;font-weight:600;line-height:1;}
+.sl{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-top:4px;}
+.filter-bar{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap;}
+.chip{padding:5px 12px;border:1.5px solid var(--rule);border-radius:100px;font-family:'DM Mono',monospace;font-size:11px;letter-spacing:.06em;text-transform:uppercase;background:#fff;cursor:pointer;transition:all .15s;}
+.chip:hover,.chip.active{background:var(--ink);color:var(--paper);border-color:var(--ink);}
+.ticket-table{width:100%;border-collapse:collapse;}
+.ticket-table thead tr{border-bottom:2px solid var(--ink);text-align:left;}
+.ticket-table th{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:8px 10px;font-weight:500;cursor:pointer;user-select:none;white-space:nowrap;}
+.ticket-table th:hover{color:var(--ink);}
+.ticket-table th.sorted .sort-icon{opacity:1;color:var(--accent);}
+.ticket-table th .sort-icon{margin-left:4px;opacity:.4;font-size:9px;}
+.ticket-table tbody tr{border-bottom:1px solid var(--rule);transition:background .12s;cursor:pointer;}
+.ticket-table tbody tr:hover{background:var(--mid);}
+.ticket-table tbody tr.sla-breach{border-left:3px solid #b91c1c;}
+.ticket-table tbody tr.sla-warn{border-left:3px solid var(--warn);}
+.ticket-table td{padding:10px;vertical-align:middle;}
+.loading-row td{text-align:center;padding:40px;color:var(--muted);font-size:12px;}
+.pri-badge{display:inline-flex;align-items:center;gap:5px;font-size:10px;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:100px;background:var(--tag);border:1px solid var(--rule);white-space:nowrap;}
+.pri-badge .dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+.dot-low{background:var(--ok);}.dot-medium{background:var(--warn);}.dot-high{background:var(--accent);}.dot-critical{background:#b91c1c;}
+.st-badge{font-size:10px;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:3px;white-space:nowrap;}
+.st-open{background:#fef3c7;color:#92400e;}.st-progress{background:#dbeafe;color:#1e3a5f;}.st-hold{background:#ede9fe;color:#5b21b6;}.st-resolved{background:#d1fae5;color:#065f46;}.st-closed{background:var(--tag);color:var(--muted);}
+.sla-badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-family:'DM Mono',monospace;padding:3px 8px;border-radius:3px;white-space:nowrap;font-weight:500;}
+.sla-ok{background:#d1fae5;color:#065f46;}.sla-warn{background:#fef3c7;color:#92400e;}.sla-breach{background:#fee2e2;color:#b91c1c;}.sla-hold{background:#ede9fe;color:#5b21b6;}.sla-met{background:var(--tag);color:var(--muted);}
+.asg-badge{font-size:10px;color:var(--muted);white-space:nowrap;}
+.asg-badge.me{color:var(--ok);}
+.tid{color:var(--muted);font-size:11px;}.ttitle{font-weight:500;}.tmeta{color:var(--muted);font-size:11px;}
+.empty{text-align:center;padding:60px 20px;color:var(--muted);}
+.empty .big{font-family:'Fraunces',serif;font-size:40px;opacity:.2;}
+.ov{display:none;position:fixed;inset:0;background:rgba(15,17,23,.35);z-index:100;}
+.ov.open{display:block;}
+.panel{position:fixed;right:-520px;top:0;bottom:0;width:500px;background:var(--paper);border-left:2px solid var(--ink);z-index:101;transition:right .25s cubic-bezier(.4,0,.2,1);overflow-y:auto;padding:28px 28px 40px;display:flex;flex-direction:column;gap:16px;}
+.panel.open{right:0;}
+.plbl{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:6px;}
+.ptitle{font-family:'Fraunces',serif;font-size:20px;font-weight:300;line-height:1.3;}
+.pbody{line-height:1.7;color:#333;white-space:pre-wrap;}
+.pr{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.pmeta{color:var(--muted);font-size:11px;}
+select.psel{width:auto;padding:6px 10px;font-size:12px;background:#fff;border:1.5px solid var(--rule);border-radius:3px;font-family:'DM Mono',monospace;cursor:pointer;outline:none;}
+textarea.ptx{width:100%;border:1.5px solid var(--rule);border-radius:3px;font-family:'DM Mono',monospace;font-size:12px;padding:10px;background:#fff;resize:vertical;outline:none;transition:border-color .15s;}
+textarea.ptx:focus{border-color:var(--ink);}
+.ptx.notes{min-height:70px;}.ptx.reply{min-height:100px;}
+.ar{display:flex;gap:8px;flex-wrap:wrap;}
+.rt{display:flex;flex-direction:column;gap:10px;}
+.rb{background:#fff;border:1.5px solid var(--rule);border-radius:4px;padding:10px 14px;font-size:12px;line-height:1.6;}
+.rb.sent{background:#e8f4f0;border-color:#b2d8cc;}
+.rb-meta{font-size:10px;color:var(--muted);letter-spacing:.06em;margin-bottom:4px;text-transform:uppercase;}
+.div{border:none;border-top:1px solid var(--rule);}
+.rs{font-size:11px;color:var(--muted);}
+.sla-block{border:1.5px solid var(--rule);border-radius:4px;padding:14px 16px;background:#fff;}
+.sla-block.ok{background:#d1fae5;border-color:#6ee7b7;}.sla-block.warn{background:#fef3c7;border-color:#fbbf24;}.sla-block.breach{background:#fee2e2;border-color:#fca5a5;}.sla-block.hold{background:#ede9fe;border-color:#c4b5fd;}.sla-block.met{background:var(--tag);border-color:var(--rule);}
+.sla-cd{font-family:'Fraunces',serif;font-size:22px;font-weight:600;line-height:1;margin-bottom:4px;}
+.sla-lbl{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);}
+.ss{background:#fff;border:1.5px solid var(--rule);border-radius:6px;margin-bottom:24px;overflow:hidden;}
+.ssh{padding:16px 20px;border-bottom:1px solid var(--rule);}
+.ssh h2{font-size:13px;font-weight:500;}.ssh p{font-size:11px;color:var(--muted);margin-top:2px;}
+.sb{padding:20px;}
+.sr{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--rule);gap:20px;}
+.sr:last-child{border-bottom:none;}.sr.col{flex-direction:column;align-items:flex-start;gap:6px;}
+.slbl{font-size:12px;font-weight:500;}.sdesc{font-size:11px;color:var(--muted);margin-top:3px;line-height:1.5;}
+.si{background:#fff;border:1.5px solid var(--rule);border-radius:3px;font-family:'DM Mono',monospace;font-size:12px;color:var(--ink);padding:7px 10px;outline:none;transition:border-color .15s;}
+.si:focus{border-color:var(--ink);}.si.wide{width:100%;font-size:11px;}.si:disabled{opacity:.5;cursor:not-allowed;background:var(--tag);}
+.toggle{position:relative;width:40px;height:22px;flex-shrink:0;}
+.toggle input{opacity:0;width:0;height:0;}
+.ts{position:absolute;inset:0;background:var(--rule);border-radius:22px;cursor:pointer;transition:background .2s;}
+.ts::before{content:'';position:absolute;width:16px;height:16px;left:3px;top:3px;background:#fff;border-radius:50%;transition:transform .2s;}
+.toggle input:checked+.ts{background:var(--ok);}.toggle input:checked+.ts::before{transform:translateX(18px);}
+.agent-list{display:flex;flex-direction:column;gap:8px;margin-bottom:14px;}
+.agent-row{display:flex;align-items:center;gap:8px;background:var(--paper);border:1.5px solid var(--rule);border-radius:4px;padding:10px 14px;}
+.agent-email{flex:1;font-size:12px;}
+.role-badge{font-size:10px;letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;border-radius:100px;background:var(--tag);border:1px solid var(--rule);color:var(--muted);}
+.role-badge.admin{background:#fef3c7;border-color:#fbbf24;color:#92400e;}.role-badge.you{border-style:dashed;}
+.rm-btn{background:none;border:none;color:var(--rule);font-size:16px;cursor:pointer;line-height:1;padding:2px 4px;transition:color .15s;}
+.rm-btn:hover{color:#b91c1c;}
+.add-row{display:flex;gap:8px;flex-wrap:wrap;}
+.save-bar{display:flex;align-items:center;gap:12px;margin-top:8px;}
+.saved{font-size:11px;color:var(--ok);display:none;}
+.admin-only-lock{font-size:11px;color:var(--muted);font-style:italic;}
+/* REPORTS */
+.report-section{display:none;}.report-section.active{display:block;}
+.rc-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px;}
+.rc{background:#fff;border:1.5px solid var(--rule);border-radius:4px;padding:18px 20px;}
+.rc-title{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.rc-val{font-family:'Fraunces',serif;font-size:32px;font-weight:600;line-height:1;}
+.rc-sub{font-size:11px;color:var(--muted);margin-top:4px;}
+.rc-bar{height:6px;background:var(--mid);border-radius:3px;margin-top:10px;overflow:hidden;}
+.rc-bar-fill{height:100%;border-radius:3px;background:var(--ok);transition:width .6s ease;}
+.rc-bar-fill.warn{background:var(--warn);}.rc-bar-fill.crit{background:#b91c1c;}
+.report-panel{background:#fff;border:1.5px solid var(--rule);border-radius:4px;padding:20px;margin-bottom:20px;}
+.report-panel h2{font-size:12px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--rule);}
+.rp-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--rule);font-size:12px;gap:12px;}
+.rp-row:last-child{border-bottom:none;}
+.rp-label{color:var(--muted);flex:1;}
+.rp-val{font-weight:500;text-align:right;white-space:nowrap;}
+.rp-bar-wrap{flex:1;height:8px;background:var(--mid);border-radius:4px;overflow:hidden;min-width:60px;}
+.rp-bar-seg{height:100%;border-radius:4px;background:var(--ok);transition:width .6s ease;}
+.alert-row{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--rule);font-size:12px;}
+.alert-row:last-child{border-bottom:none;}
+.alert-sev{font-size:9px;letter-spacing:.08em;text-transform:uppercase;padding:2px 7px;border-radius:100px;white-space:nowrap;flex-shrink:0;margin-top:2px;}
+.sev-high{background:#fee2e2;color:#b91c1c;}.sev-medium{background:#fef3c7;color:#92400e;}.sev-low{background:#d1fae5;color:#065f46;}.sev-informational{background:var(--tag);color:var(--muted);}
+.alert-title{flex:1;font-weight:500;line-height:1.4;}
+.alert-meta{color:var(--muted);font-size:11px;white-space:nowrap;flex-shrink:0;}
+.config-note{background:#fef3c7;border:1.5px solid #fbbf24;border-radius:4px;padding:12px 16px;font-size:12px;color:#92400e;line-height:1.6;margin-bottom:20px;}
+.data-status{display:inline-flex;align-items:center;gap:6px;font-size:11px;padding:4px 10px;border-radius:100px;border:1px solid var(--rule);background:var(--tag);color:var(--muted);}
+.data-status.live{background:#d1fae5;border-color:#6ee7b7;color:#065f46;}.data-status.manual{background:#fef3c7;border-color:#fbbf24;color:#92400e;}
+.manual-entry-wrap{background:var(--paper);border:1.5px dashed var(--rule);border-radius:4px;padding:20px;margin-bottom:20px;}
+.manual-entry-wrap h3{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:12px;}
+.me-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+.me-field label{font-size:11px;color:var(--muted);display:block;margin-bottom:4px;}
+.me-field input{width:100%;font-family:'DM Mono',monospace;font-size:13px;font-weight:500;padding:8px 10px;border:1.5px solid var(--rule);border-radius:3px;background:#fff;outline:none;transition:border-color .15s;}
+.me-field input:focus{border-color:var(--ink);}
+.export-item{display:block;width:100%;text-align:left;background:none;border:none;font-family:'DM Mono',monospace;font-size:12px;padding:10px 14px;cursor:pointer;color:var(--ink);transition:background .12s;}
+.export-item:hover{background:var(--mid);}
+.ticket-table tbody tr.ticket-unseen{background:#eeecea;}
+.ticket-table tbody tr.ticket-unseen:hover{background:var(--mid);}
+.unseen-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--accent);margin-left:7px;vertical-align:middle;flex-shrink:0;}
+/* ── Option A: Panel meta card ── */
+.panel-meta-card{display:grid;grid-template-columns:1fr 1fr;gap:14px;background:var(--tag);border:1px solid var(--rule);border-radius:4px;padding:14px;margin:4px 0;}
+.p-requester-row{display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap;}
+.p-requester-row>div{flex:1;min-width:0;}
+/* ── Phase 3: Watchers ── */
+.watcher-tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;min-height:24px;}
+.watcher-tag{display:inline-flex;align-items:center;gap:5px;background:var(--tag);border:1px solid var(--rule);border-radius:100px;padding:2px 10px 2px 10px;font-size:11px;}
+.watcher-tag button{background:none;border:none;cursor:pointer;color:var(--muted);font-size:12px;line-height:1;padding:0;display:flex;align-items:center;}
+.watcher-tag button:hover{color:var(--accent);}
+.watcher-add-row{display:flex;gap:6px;align-items:center;}
+.watcher-add-row .si{flex:1;min-width:0;}
+/* ── Phase 3: Workload modal ── */
+.modal-ov{display:none;position:fixed;inset:0;background:rgba(15,17,23,.55);z-index:300;align-items:center;justify-content:center;}
+.modal-ov.open{display:flex;}
+.modal{background:var(--paper);border:2px solid var(--ink);border-radius:6px;padding:28px;max-width:640px;width:90%;max-height:80vh;overflow-y:auto;position:relative;}
+.modal h2{font-family:'Fraunces',serif;font-size:20px;font-weight:300;margin-bottom:18px;}
+.modal-close{position:absolute;top:14px;right:16px;background:none;border:none;font-size:18px;cursor:pointer;color:var(--muted);}
+.modal-close:hover{color:var(--ink);}
+.wl-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--rule);}
+.wl-row:last-child{border-bottom:none;}
+.wl-name{flex:1;font-size:12px;}
+.wl-bar-wrap{flex:2;background:var(--mid);border-radius:100px;height:8px;overflow:hidden;}
+.wl-bar{height:100%;border-radius:100px;background:var(--ok);transition:width .3s;}
+.wl-bar.warn{background:var(--warn);}
+.wl-bar.crit{background:var(--accent);}
+.wl-count{font-size:11px;color:var(--muted);min-width:60px;text-align:right;}
+.wl-breakdown{font-size:10px;color:var(--muted);min-width:140px;text-align:right;}
+/* ── Phase 3: Merge modal ── */
+.merge-list{max-height:320px;overflow-y:auto;margin:12px 0;}
+.merge-item{padding:10px 12px;border:1.5px solid var(--rule);border-radius:4px;margin-bottom:6px;cursor:pointer;transition:all .15s;}
+.merge-item:hover{border-color:var(--ink);background:var(--mid);}
+.merge-item.selected{border-color:var(--ink);background:var(--mid);}
+.merge-item .mi-id{font-size:10px;color:var(--muted);}
+.merge-item .mi-title{font-size:12px;font-weight:500;margin:2px 0;}
+.merge-item .mi-meta{font-size:10px;color:var(--muted);}
+.merge-search{width:100%;margin-bottom:10px;}
+@media(max-width:640px){
+  .stats{grid-template-columns:1fr 1fr;}
+  .panel{width:100%;right:-100%;}
+  .pr{grid-template-columns:1fr;}
+  .rc-grid{grid-template-columns:1fr 1fr;}
+  .me-grid{grid-template-columns:1fr 1fr;}
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-brand">IT<span>desk</span></div>
+  <span id="nav-tabs" style="display:contents;visibility:hidden;">
+    <button class="nav-btn active" id="nb-tickets">Tickets</button>
+    <button class="nav-btn"        id="nb-archive">Archive</button>
+    <button class="nav-btn"        id="nb-reports">Reports</button>
+    <button class="nav-btn"        id="nb-settings">Settings</button>
+  </span>
+  <div class="nav-spacer"></div>
+  <div class="nav-user" id="nav-user" style="display:none">
+    <span class="nav-role" id="nav-role-badge">Agent</span>
+    <span id="nav-name"></span>
+    <button class="sign-out-btn" id="btn-signout">Sign out</button>
+  </div>
+</nav>
+
+<div id="screen-auth" class="auth-wrap">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 23 23" width="44" height="44">
+    <rect x="1" y="1" width="10" height="10" fill="#f25022"/>
+    <rect x="12" y="1" width="10" height="10" fill="#7fba00"/>
+    <rect x="1" y="12" width="10" height="10" fill="#00a4ef"/>
+    <rect x="12" y="12" width="10" height="10" fill="#ffb900"/>
+  </svg>
+  <h2>Agent Dashboard</h2>
+  <p>Sign in with your Te Rito Maioha Microsoft account to continue.</p>
+  <button class="ms-btn" id="btn-signin">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 23 23" width="20" height="20">
+      <rect x="1" y="1" width="10" height="10" fill="#f25022"/>
+      <rect x="12" y="1" width="10" height="10" fill="#7fba00"/>
+      <rect x="1" y="12" width="10" height="10" fill="#00a4ef"/>
+      <rect x="12" y="12" width="10" height="10" fill="#ffb900"/>
+    </svg>
+    Sign in with Microsoft
+  </button>
+  <div class="auth-err" id="auth-err"></div>
+</div>
+
+<div id="screen-denied" style="display:none;" class="auth-wrap">
+  <div style="font-size:40px;opacity:.15">&#128683;</div>
+  <h2>Access Denied</h2>
+  <p id="denied-msg">Your account does not have permission.</p>
+  <button class="ms-btn" id="btn-signout-denied" style="font-size:12px;padding:8px 18px;">Sign out</button>
+</div>
+
+<!-- TICKETS -->
+<div class="page" id="page-tickets">
+  <div class="ph">
+    <h1>All tickets</h1>
+    <div class="pa">
+      <span style="font-size:11px;color:var(--muted);" id="dash-date"></span>
+      <button class="btn" id="btn-refresh">&#8635; Refresh</button>
+      <button class="btn" id="btn-workload">&#9646;&#9646; Workload</button>
+      <button class="btn" id="btn-export-csv">&#8659; Export CSV</button>
+    </div>
+  </div>
+  <div class="stats">
+    <div class="sc"><div class="sn" id="s-open">&#8212;</div><div class="sl">Open</div></div>
+    <div class="sc warn"><div class="sn" id="s-progress">&#8212;</div><div class="sl">In Progress</div></div>
+    <div class="sc hold"><div class="sn" id="s-hold">&#8212;</div><div class="sl">On Hold</div></div>
+    <div class="sc ok"><div class="sn" id="s-resolved">&#8212;</div><div class="sl">Closed</div></div>
+    <div class="sc crit"><div class="sn" id="s-breached">&#8212;</div><div class="sl">SLA Breached</div></div>
+  </div>
+  <div class="filter-bar">
+    <button class="chip active" data-filter="all">All</button>
+    <button class="chip" data-filter="open">Open</button>
+    <button class="chip" data-filter="unassigned">Unassigned</button>
+    <button class="chip" data-filter="in-progress">In Progress</button>
+    <button class="chip" data-filter="on-hold">On Hold</button>
+    <button class="chip" data-filter="closed">Closed</button>
+    <button class="chip" data-filter="mine">Assigned to me</button>
+    <button class="chip" data-filter="breached">SLA Breached</button>
+  </div>
+  <table class="ticket-table" id="main-table">
+    <thead><tr>
+      <th data-col="id">ID<span class="sort-icon">&#8597;</span></th>
+      <th data-col="subject">Subject<span class="sort-icon">&#8597;</span></th>
+      <th data-col="priority">Priority<span class="sort-icon">&#8597;</span></th>
+      <th data-col="status">Status<span class="sort-icon">&#8597;</span></th>
+      <th>SLA</th>
+      <th data-col="assignee">Assigned<span class="sort-icon">&#8597;</span></th>
+      <th data-col="created">Submitted<span class="sort-icon">&#8597;</span></th>
+    </tr></thead>
+    <tbody id="ticket-body"><tr class="loading-row"><td colspan="7">Loading&hellip;</td></tr></tbody>
+  </table>
+  <div class="empty" id="empty-state" style="display:none"><div class="big">&#10003;</div><p>No tickets match this filter.</p></div>
+</div>
+
+<!-- ARCHIVE -->
+<div class="page" id="page-archive">
+  <div class="ph">
+    <h1>Archive</h1>
+    <div class="pa"><button class="btn" id="btn-export-archive">&#8659; Export CSV</button></div>
+  </div>
+  <p style="color:var(--muted);font-size:12px;margin-bottom:20px;">Closed tickets older than your archive threshold appear here.</p>
+  <table class="ticket-table">
+    <thead><tr><th>ID</th><th>Subject</th><th>Priority</th><th>Closed</th><th>Assigned</th></tr></thead>
+    <tbody id="archive-body"><tr class="loading-row"><td colspan="5">Loading&hellip;</td></tr></tbody>
+  </table>
+  <div class="empty" id="archive-empty" style="display:none"><div class="big">&#128193;</div><p>No archived tickets yet.</p></div>
+</div>
+
+<!-- REPORTS -->
+<div class="page" id="page-reports">
+  <div class="ph">
+    <h1>Reports</h1>
+    <div class="pa">
+      <span id="report-updated" style="font-size:11px;color:var(--muted);"></span>
+      <button class="btn" id="btn-report-refresh">&#8635; Refresh</button>
+      <div style="position:relative;display:inline-block;" id="export-wrap">
+        <button class="btn" id="btn-export-toggle">&#8659; Export &#9662;</button>
+        <div id="export-menu" style="display:none;position:absolute;right:0;top:calc(100% + 4px);background:#fff;border:1.5px solid var(--ink);border-radius:4px;z-index:50;min-width:220px;box-shadow:0 4px 16px rgba(0,0,0,.12);">
+          <div style="padding:8px 14px;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--rule);">PDF — print / save</div>
+          <button class="export-item" id="btn-export-pdf-active">&#128196; Current section as PDF</button>
+          <button class="export-item" id="btn-export-pdf-all">&#128196; All sections as PDF</button>
+          <div style="padding:8px 14px;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);">CSV — raw data</div>
+          <button class="export-item" id="btn-export-csv-active">&#128202; Current section as CSV</button>
+          <button class="export-item" id="btn-export-csv-all">&#128202; All sections as CSV</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sub-nav -->
+  <div class="filter-bar" style="margin-bottom:28px;">
+    <button class="chip active" id="rc-tickets">&#127897; Tickets</button>
+    <button class="chip"        id="rc-defender">&#128737; Defender</button>
+    <button class="chip"        id="rc-phishing">&#127907; Phriendly Phishing</button>
+    <button class="chip"        id="rc-syskit">&#128202; Syskit</button>
+  </div>
+
+  <!-- ══ TICKETS REPORT ══ -->
+  <div class="report-section active" id="rs-tickets">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
+      <span style="font-size:11px;color:var(--muted);">Computed from live ticket data &middot; <span class="data-status live">&#9679; Live</span></span>
+      <select id="rpt-range" class="si" style="font-size:11px;padding:5px 8px;">
+        <option value="7">Last 7 days</option>
+        <option value="30" selected>Last 30 days</option>
+        <option value="90">Last 90 days</option>
+        <option value="0">All time</option>
+      </select>
+    </div>
+    <div class="rc-grid">
+      <div class="rc"><div class="rc-title">Total tickets</div><div class="rc-val" id="rpt-total">&#8212;</div><div class="rc-sub" id="rpt-total-sub"></div></div>
+      <div class="rc"><div class="rc-title">Resolved / closed</div><div class="rc-val" id="rpt-resolved">&#8212;</div><div class="rc-sub" id="rpt-resolved-sub"></div><div class="rc-bar"><div class="rc-bar-fill" id="rpt-resolved-bar" style="width:0%"></div></div></div>
+      <div class="rc"><div class="rc-title">SLA compliance</div><div class="rc-val" id="rpt-sla">&#8212;</div><div class="rc-sub">tickets met SLA target</div><div class="rc-bar"><div class="rc-bar-fill" id="rpt-sla-bar" style="width:0%"></div></div></div>
+      <div class="rc"><div class="rc-title">Unassigned</div><div class="rc-val" id="rpt-unassigned">&#8212;</div><div class="rc-sub">open with no agent</div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+      <div class="report-panel"><h2>By category</h2><div id="rpt-by-cat"><div style="color:var(--muted);font-size:12px;">No data</div></div></div>
+      <div class="report-panel"><h2>By priority</h2><div id="rpt-by-pri"><div style="color:var(--muted);font-size:12px;">No data</div></div></div>
+    </div>
+    <div class="report-panel"><h2>By agent</h2><div id="rpt-by-agent"><div style="color:var(--muted);font-size:12px;">No data</div></div></div>
+  </div>
+
+  <!-- ══ DEFENDER REPORT ══ -->
+  <div class="report-section" id="rs-defender">
+    <div class="config-note" id="defender-config-note" style="display:none;">
+      <strong style="display:block;margin-bottom:4px;">Microsoft Graph permissions needed</strong>
+      To pull live Defender alerts, your Azure app registration needs <strong>SecurityAlert.Read.All</strong> with admin consent. Until then, enter data manually below.
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
+      <span class="data-status" id="defender-status-badge">&#9679; Checking&hellip;</span>
+      <button class="btn sm" id="btn-defender-fetch">&#8635; Try live fetch</button>
+    </div>
+    <div class="manual-entry-wrap" id="defender-manual">
+      <h3>Manual data entry — paste from Defender portal</h3>
+      <div class="me-grid" style="margin-bottom:12px;">
+        <div class="me-field"><label>High severity</label><input type="number" id="def-high" min="0" value="0"/></div>
+        <div class="me-field"><label>Medium severity</label><input type="number" id="def-med" min="0" value="0"/></div>
+        <div class="me-field"><label>Low severity</label><input type="number" id="def-low" min="0" value="0"/></div>
+        <div class="me-field"><label>Informational</label><input type="number" id="def-info" min="0" value="0"/></div>
+        <div class="me-field"><label>New (this week)</label><input type="number" id="def-new" min="0" value="0"/></div>
+        <div class="me-field"><label>Resolved (this week)</label><input type="number" id="def-resolved" min="0" value="0"/></div>
+      </div>
+      <button class="btn pri sm" id="btn-defender-save">Save snapshot</button>
+      <span id="def-saved" style="font-size:11px;color:var(--ok);margin-left:10px;display:none;">&#10003; Saved</span>
+    </div>
+    <div class="rc-grid">
+      <div class="rc"><div class="rc-title">High severity</div><div class="rc-val" id="def-s-high" style="color:#b91c1c;">&#8212;</div><div class="rc-sub">active alerts</div></div>
+      <div class="rc"><div class="rc-title">Medium severity</div><div class="rc-val" id="def-s-med" style="color:var(--warn);">&#8212;</div><div class="rc-sub">active alerts</div></div>
+      <div class="rc"><div class="rc-title">Low severity</div><div class="rc-val" id="def-s-low" style="color:var(--ok);">&#8212;</div><div class="rc-sub">active alerts</div></div>
+      <div class="rc"><div class="rc-title">Informational</div><div class="rc-val" id="def-s-info">&#8212;</div><div class="rc-sub">active alerts</div></div>
+    </div>
+    <div class="report-panel">
+      <h2>Recent alerts <span id="def-alerts-src" style="font-weight:400;text-transform:none;letter-spacing:0;font-size:11px;color:var(--muted);"></span></h2>
+      <div id="def-alert-list"><div style="color:var(--muted);font-size:12px;padding:12px 0;">Enter data above or connect via Graph API.</div></div>
+    </div>
+  </div>
+
+  <!-- ══ PHISHING REPORT ══ -->
+  <div class="report-section" id="rs-phishing">
+    <div class="config-note" id="phishing-flow-note" style="display:none;">
+      <strong style="display:block;margin-bottom:4px;">Power Automate flow not configured</strong>
+      Add your Phriendly Phishing flow URL in Settings &rarr; Report integrations to pull data automatically. Until then, enter manually below.
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
+      <span class="data-status" id="phish-status-badge">&#9679; Manual</span>
+      <button class="btn sm" id="btn-phishing-fetch">&#8635; Try flow fetch</button>
+    </div>
+    <div class="manual-entry-wrap" id="phishing-manual">
+      <h3>Manual data entry — paste from Phriendly Phishing dashboard</h3>
+      <div class="me-grid" style="margin-bottom:12px;">
+        <div class="me-field"><label>Campaign name</label><input type="text" id="ph-campaign" placeholder="e.g. April 2025"/></div>
+        <div class="me-field"><label>Emails sent</label><input type="number" id="ph-sent" min="0" value="0"/></div>
+        <div class="me-field"><label>Opened email</label><input type="number" id="ph-opened" min="0" value="0"/></div>
+        <div class="me-field"><label>Clicked link</label><input type="number" id="ph-clicked" min="0" value="0"/></div>
+        <div class="me-field"><label>Submitted data</label><input type="number" id="ph-submitted" min="0" value="0"/></div>
+        <div class="me-field"><label>Reported phish</label><input type="number" id="ph-reported" min="0" value="0"/></div>
+        <div class="me-field"><label>Training completed</label><input type="number" id="ph-trained" min="0" value="0"/></div>
+        <div class="me-field"><label>At risk (%)</label><input type="number" id="ph-atrisk" min="0" max="100" value="0"/></div>
+      </div>
+      <button class="btn pri sm" id="btn-phishing-save">Save snapshot</button>
+      <span id="ph-saved" style="font-size:11px;color:var(--ok);margin-left:10px;display:none;">&#10003; Saved</span>
+    </div>
+    <div class="rc-grid">
+      <div class="rc"><div class="rc-title">Click rate</div><div class="rc-val" id="ph-s-click">&#8212;</div><div class="rc-sub">clicked the link</div><div class="rc-bar"><div class="rc-bar-fill crit" id="ph-bar-click" style="width:0%"></div></div></div>
+      <div class="rc"><div class="rc-title">Report rate</div><div class="rc-val" id="ph-s-report">&#8212;</div><div class="rc-sub">reported the phish</div><div class="rc-bar"><div class="rc-bar-fill" id="ph-bar-report" style="width:0%"></div></div></div>
+      <div class="rc"><div class="rc-title">Training done</div><div class="rc-val" id="ph-s-trained">&#8212;</div><div class="rc-sub">completed training</div><div class="rc-bar"><div class="rc-bar-fill" id="ph-bar-trained" style="width:0%"></div></div></div>
+      <div class="rc"><div class="rc-title">At risk</div><div class="rc-val" id="ph-s-atrisk" style="color:#b91c1c;">&#8212;</div><div class="rc-sub">% of staff</div></div>
+    </div>
+    <div class="report-panel">
+      <h2>Campaign breakdown <span id="ph-campaign-label" style="font-weight:400;text-transform:none;letter-spacing:0;font-size:11px;color:var(--muted);"></span></h2>
+      <div id="ph-breakdown"><div style="color:var(--muted);font-size:12px;padding:12px 0;">Enter campaign data above.</div></div>
+    </div>
+  </div>
+
+  <!-- ══ SYSKIT REPORT ══ -->
+  <div class="report-section" id="rs-syskit">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
+      <span style="font-size:11px;color:var(--muted);"><span class="data-status manual">&#9679; Manual</span> &middot; Export from Syskit Point and paste figures here</span>
+    </div>
+    <div class="manual-entry-wrap">
+      <h3>Governance snapshot — paste from Syskit Point</h3>
+      <div class="me-grid" style="margin-bottom:12px;">
+        <div class="me-field"><label>Active Teams</label><input type="number" id="sk-teams" min="0" value="0"/></div>
+        <div class="me-field"><label>Inactive Teams</label><input type="number" id="sk-teams-inactive" min="0" value="0"/></div>
+        <div class="me-field"><label>M365 Groups</label><input type="number" id="sk-groups" min="0" value="0"/></div>
+        <div class="me-field"><label>Orphaned</label><input type="number" id="sk-orphaned" min="0" value="0"/></div>
+        <div class="me-field"><label>Licensed users</label><input type="number" id="sk-users" min="0" value="0"/></div>
+        <div class="me-field"><label>Guest users</label><input type="number" id="sk-guests" min="0" value="0"/></div>
+        <div class="me-field"><label>Inactive users</label><input type="number" id="sk-inactive" min="0" value="0"/></div>
+        <div class="me-field"><label>Shared mailboxes</label><input type="number" id="sk-shared" min="0" value="0"/></div>
+        <div class="me-field"><label>Anon share links</label><input type="number" id="sk-anon" min="0" value="0"/></div>
+        <div class="me-field"><label>Ext. share links</label><input type="number" id="sk-ext" min="0" value="0"/></div>
+        <div class="me-field"><label>Storage used (GB)</label><input type="number" id="sk-storage" min="0" value="0" step="0.1"/></div>
+        <div class="me-field"><label>Storage total (GB)</label><input type="number" id="sk-storage-total" min="0" value="0" step="0.1"/></div>
+      </div>
+      <button class="btn pri sm" id="btn-syskit-save">Save snapshot</button>
+      <span id="sk-saved" style="font-size:11px;color:var(--ok);margin-left:10px;display:none;">&#10003; Saved</span>
+    </div>
+    <div class="rc-grid">
+      <div class="rc"><div class="rc-title">Active Teams</div><div class="rc-val" id="sk-s-teams">&#8212;</div><div class="rc-sub" id="sk-s-teams-sub"></div></div>
+      <div class="rc"><div class="rc-title">Guest users</div><div class="rc-val" id="sk-s-guests" style="color:var(--warn);">&#8212;</div><div class="rc-sub">external access</div></div>
+      <div class="rc"><div class="rc-title">Anonymous links</div><div class="rc-val" id="sk-s-anon" style="color:#b91c1c;">&#8212;</div><div class="rc-sub">review recommended</div></div>
+      <div class="rc"><div class="rc-title">Storage used</div><div class="rc-val" id="sk-s-storage">&#8212;</div><div class="rc-sub" id="sk-s-storage-sub"></div><div class="rc-bar"><div class="rc-bar-fill warn" id="sk-bar-storage" style="width:0%"></div></div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+      <div class="report-panel"><h2>Teams &amp; Groups</h2><div id="sk-teams-breakdown"><div style="color:var(--muted);font-size:12px;">Enter data above.</div></div></div>
+      <div class="report-panel"><h2>Users</h2><div id="sk-users-breakdown"><div style="color:var(--muted);font-size:12px;">Enter data above.</div></div></div>
+    </div>
+    <div class="report-panel"><h2>Sharing &amp; governance risks</h2><div id="sk-sharing-breakdown"><div style="color:var(--muted);font-size:12px;">Enter data above.</div></div></div>
+  </div>
+</div>
+
+<!-- SETTINGS -->
+<div class="page" id="page-settings">
+  <div class="ph"><h1>Settings</h1></div>
+  <div class="ss">
+    <div class="ssh"><h2>Agent Access &amp; Roles</h2><p>Manage who can access the dashboard. Only admins can add or remove agents.</p></div>
+    <div class="sb">
+      <div class="agent-list" id="agent-list"></div>
+      <div id="agent-add-section">
+        <div class="add-row">
+          <input type="email" id="new-agent-email" class="si" style="flex:1;min-width:200px;" placeholder="name@ecnz.ac.nz"/>
+          <select id="new-agent-role" class="si"><option value="agent">Agent</option><option value="admin">Administrator</option></select>
+          <button class="btn pri" id="btn-add-agent">+ Add</button>
+        </div>
+        <div id="agent-err" style="font-size:11px;color:var(--accent);margin-top:8px;display:none;"></div>
+      </div>
+      <div id="agent-locked-msg" style="display:none;" class="admin-only-lock">&#128274; Only administrators can add or remove agents.</div>
+    </div>
+  </div>
+  <div class="ss">
+    <div class="ssh"><h2>SLA Targets</h2><p>Maximum response time before a ticket is flagged as breached. Admin only.</p></div>
+    <div class="sb">
+      <div class="sr"><div><div class="slbl">&#128308; Critical</div><div class="sdesc">Complete outage, no workaround</div></div><div style="display:flex;align-items:center;gap:6px;"><input type="number" id="s-sla-crit" class="si" value="1" min="1" style="width:60px;text-align:center;"/><span style="font-size:11px;color:var(--muted);">hrs</span></div></div>
+      <div class="sr"><div><div class="slbl">&#128992; High</div><div class="sdesc">Cannot work, no workaround</div></div><div style="display:flex;align-items:center;gap:6px;"><input type="number" id="s-sla-high" class="si" value="4" min="1" style="width:60px;text-align:center;"/><span style="font-size:11px;color:var(--muted);">hrs</span></div></div>
+      <div class="sr"><div><div class="slbl">&#128993; Medium</div><div class="sdesc">Workaround available</div></div><div style="display:flex;align-items:center;gap:6px;"><input type="number" id="s-sla-med" class="si" value="8" min="1" style="width:60px;text-align:center;"/><span style="font-size:11px;color:var(--muted);">hrs</span></div></div>
+      <div class="sr"><div><div class="slbl">&#128994; Low</div><div class="sdesc">Minor inconvenience</div></div><div style="display:flex;align-items:center;gap:6px;"><input type="number" id="s-sla-low" class="si" value="24" min="1" style="width:60px;text-align:center;"/><span style="font-size:11px;color:var(--muted);">hrs</span></div></div>
+    </div>
+  </div>
+  <div class="ss">
+    <div class="ssh"><h2>General</h2><p>Display and behaviour preferences</p></div>
+    <div class="sb">
+      <div class="sr"><div><div class="slbl">Show demo data when no tickets</div><div class="sdesc">Fills dashboard with sample tickets until real ones arrive</div></div><label class="toggle"><input type="checkbox" id="s-demo" checked/><span class="ts"></span></label></div>
+      <div class="sr"><div><div class="slbl">Auto-refresh every 5 minutes</div><div class="sdesc">Automatically reload tickets while the dashboard is open</div></div><label class="toggle"><input type="checkbox" id="s-autorefresh"/><span class="ts"></span></label></div>
+      <div class="sr"><div><div class="slbl">Archive closed tickets after (days)</div><div class="sdesc">Closed tickets older than this move to Archive</div></div><input type="number" id="s-archivedays" class="si" value="7" min="1" max="90" style="width:70px;text-align:center;"/></div>
+    </div>
+  </div>
+  <div class="ss">
+    <div class="ssh"><h2>Power Automate — Email Flows</h2><p>Only email flows are needed now. SharePoint read/write is handled directly.</p></div>
+    <div class="sb">
+      <div class="sr col"><div class="slbl">Send reply (Flow 4)</div><input type="url" id="s-fl-reply" class="si wide" placeholder="https://prod-xx..."/></div>
+      <div class="sr col" style="border-bottom:none"><div class="slbl">Submit ticket confirmation (Flow 1)</div><input type="url" id="s-fl-submit" class="si wide" placeholder="https://prod-xx..."/></div>
+    </div>
+  </div>
+  <div class="ss">
+    <div class="ssh"><h2>Report integrations</h2><p>Configure data sources for the Reports tab. Power Automate flows bridge APIs that don't support CORS.</p></div>
+    <div class="sb">
+      <div class="sr col"><div class="slbl">Phriendly Phishing — Flow URL</div><div class="sdesc">Power Automate flow that calls the Phriendly Phishing API and returns campaign JSON</div><input type="url" id="s-fl-phishing" class="si wide" placeholder="https://prod-xx..."/></div>
+      <div class="sr col" style="border-bottom:none"><div class="slbl">Syskit Point — Flow URL</div><div class="sdesc">Optional: Power Automate flow that returns a Syskit governance snapshot JSON</div><input type="url" id="s-fl-syskit" class="si wide" placeholder="https://prod-xx..."/></div>
+    </div>
+  </div>
+  <div class="save-bar">
+    <button class="btn pri" id="btn-settings-save">Save all settings</button>
+    <span class="saved" id="saved-msg">&#10003; Settings saved</span>
+    <span id="settings-err" style="font-size:11px;color:var(--accent);display:none;"></span>
+  </div>
+</div>
+
+<!-- PANEL -->
+<div class="ov" id="panel-ov"></div>
+<div class="panel" id="panel">
+  <button class="btn sm" id="btn-panel-close" style="align-self:flex-end;">&#10005; close</button>
+  <div class="tid" id="p-id"></div>
+  <div class="ptitle" id="p-title"></div>
+
+  <!-- Requester -->
+  <div class="p-requester-row">
+    <div><div class="plbl">Requester</div><div id="p-name" style="font-weight:500"></div><div id="p-email" class="pmeta"></div><div id="p-dept" class="pmeta"></div></div>
+  </div>
+
+  <!-- Original request -->
+  <div><div class="plbl">Original request</div><div class="pbody" id="p-body"></div></div>
+
+  <!-- Meta card: Category · Priority · Status · SLA -->
+  <div class="panel-meta-card">
+    <div><div class="plbl">Category</div><select class="psel" id="p-cat-sel"></select></div>
+    <div><div class="plbl">Priority</div><select class="psel" id="p-priority-sel"><option value="low">&#128994; Low</option><option value="medium">&#128993; Medium</option><option value="high">&#128992; High</option><option value="critical">&#128308; Critical</option></select></div>
+    <div><div class="plbl">Status</div><select class="psel" id="p-status-sel"></select></div>
+    <div><div class="plbl">SLA</div><div class="sla-block" id="p-sla-block"><div class="sla-cd" id="p-sla-cd">—</div><div class="sla-lbl" id="p-sla-lbl">—</div></div></div>
+  </div>
+
+  <!-- Assigned to -->
+  <div>
+    <div class="plbl">Assigned to</div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <select class="psel" id="p-asg-sel" style="flex:1;min-width:160px;"></select>
+      <button class="btn ok" id="pickup-btn">&#9995; Pick up</button>
+    </div>
+  </div>
+
+  <hr class="div"/>
+
+  <!-- Conversation -->
+  <div><div class="plbl">Conversation</div><div class="rt" id="reply-thread"></div></div>
+
+  <!-- CC / Watchers — near reply for context -->
+  <div>
+    <div class="plbl">CC / Watchers <span style="font-size:10px;color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0;">— copied on all replies</span></div>
+    <div id="watcher-tags" class="watcher-tags"></div>
+    <div class="watcher-add-row">
+      <input type="email" id="watcher-input" class="si" placeholder="name@ecnz.ac.nz"/>
+      <button class="btn sm" id="btn-add-watcher">+ Add</button>
+    </div>
+  </div>
+
+  <!-- Reply -->
+  <div>
+    <div class="plbl">Reply to staff member</div>
+    <textarea class="ptx reply" id="p-reply" placeholder="Type your reply — this will be emailed to the requester&hellip;"></textarea>
+    <div style="display:flex;gap:8px;align-items:center;margin-top:8px;">
+      <button class="btn ok" id="send-btn">&#9993; Send reply</button>
+      <span class="rs" id="reply-status"></span>
+    </div>
+  </div>
+
+  <hr class="div"/>
+
+  <!-- Internal notes -->
+  <div><div class="plbl">Internal notes (not sent to staff)</div><textarea class="ptx notes" id="p-notes" placeholder="Add internal notes&hellip;"></textarea></div>
+  <div class="ar">
+    <button class="btn pri" id="btn-save-notes">Save notes</button>
+    <button class="btn" id="cycle-btn">Mark in progress</button>
+    <button class="btn" id="btn-merge" style="display:none;">&#8644; Merge</button>
+    <button class="btn danger" id="del-btn">Delete</button>
+  </div>
+</div>
+
+<!-- WORKLOAD MODAL -->
+<div class="modal-ov" id="workload-modal-ov">
+  <div class="modal">
+    <button class="modal-close" id="btn-workload-close">&#10005;</button>
+    <h2>Agent Workload</h2>
+    <div id="workload-body"><div style="color:var(--muted);font-size:12px;">Loading&hellip;</div></div>
+  </div>
+</div>
+
+<!-- MERGE MODAL -->
+<div class="modal-ov" id="merge-modal-ov">
+  <div class="modal">
+    <button class="modal-close" id="btn-merge-close">&#10005;</button>
+    <h2>Merge Ticket</h2>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:14px;">Select the ticket to merge <strong>into</strong> the current one. Replies from both tickets will be combined. The selected ticket will be closed.</p>
+    <input type="text" class="si merge-search" id="merge-search" placeholder="Search by ID or subject&hellip;"/>
+    <div class="merge-list" id="merge-list"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;">
+      <button class="btn" id="btn-merge-cancel">Cancel</button>
+      <button class="btn pri" id="btn-merge-confirm">&#8644; Merge tickets</button>
+    </div>
+  </div>
+</div>
+
+<script src="dashboard.js"></script>
+</body>
+</html>
