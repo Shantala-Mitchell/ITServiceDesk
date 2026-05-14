@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src https://graph.microsoft.com https://login.microsoftonline.com https://*.logic.azure.com https://*.azure.com https://*.powerplatform.com https://*.api.powerplatform.com https://*.environment.api.powerplatform.com https://default21827f8a.a9.environment.api.powerplatform.com; img-src 'self' data:;"/>
+<title>IT Service Desk — Agent Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.14.0/lib/msal-browser.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,wght@0,300;0,600;1,300&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="dashboard.css"/>
+</head>
+<body>
+
+<nav>
+  <div class="nav-brand">IT<span>desk</span></div>
+  <span class="nav-tabs-wrap" id="nav-tabs">
+    <button class="nav-btn active" id="nb-tickets">Tickets</button>
+    <button class="nav-btn"        id="nb-archive">Archive</button>
+    <button class="nav-btn"        id="nb-reports">Reports</button>
+    <button class="nav-btn"        id="nb-settings">Settings</button>
+  </span>
+  <div class="nav-spacer"></div>
+  <div class="nav-user hidden" id="nav-user">
+    <span class="nav-role" id="nav-role-badge">Agent</span>
+    <span id="nav-name"></span>
+    <button class="sign-out-btn" id="btn-signout">Sign out</button>
+  </div>
+</nav>
+
+<div id="screen-auth" class="auth-wrap">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 23 23" width="44" height="44">
+    <rect x="1" y="1" width="10" height="10" fill="#f25022"/>
+    <rect x="12" y="1" width="10" height="10" fill="#7fba00"/>
+    <rect x="1" y="12" width="10" height="10" fill="#00a4ef"/>
+    <rect x="12" y="12" width="10" height="10" fill="#ffb900"/>
+  </svg>
+  <h2>Agent Dashboard</h2>
+  <p>Sign in with your Te Rito Maioha Microsoft account to continue.</p>
+  <button class="ms-btn" id="btn-signin">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 23 23" width="20" height="20">
+      <rect x="1" y="1" width="10" height="10" fill="#f25022"/>
+      <rect x="12" y="1" width="10" height="10" fill="#7fba00"/>
+      <rect x="1" y="12" width="10" height="10" fill="#00a4ef"/>
+      <rect x="12" y="12" width="10" height="10" fill="#ffb900"/>
+    </svg>
+    Sign in with Microsoft
+  </button>
+  <div class="auth-err" id="auth-err"></div>
+</div>
+
+<div id="screen-denied" class="auth-wrap hidden">
+  <div class="icon-bg-lrg">&#128683;</div>
+  <h2>Access Denied</h2>
+  <p id="denied-msg">Your account does not have permission.</p>
+  <button class="ms-btn btn-txt-sm" id="btn-signout-denied">Sign out</button>
+</div>
+
+<!-- TICKETS -->
+<div class="page" id="page-tickets">
+  <div class="ph">
+    <h1>All tickets</h1>
+    <div class="pa">
+      <span class="txt-muted-xs" id="dash-date"></span>
+      <button class="btn" id="btn-refresh">&#8635; Refresh</button>
+      <button class="btn" id="btn-workload">&#9646;&#9646; Workload</button>
+      <button class="btn" id="btn-export-csv">&#8659; Export CSV</button>
+    </div>
+  </div>
+  <div class="stats">
+    <div class="sc"><div class="sn" id="s-open">&#8212;</div><div class="sl">Open</div></div>
+    <div class="sc warn"><div class="sn" id="s-progress">&#8212;</div><div class="sl">In Progress</div></div>
+    <div class="sc hold"><div class="sn" id="s-hold">&#8212;</div><div class="sl">On Hold</div></div>
+    <div class="sc ok"><div class="sn" id="s-resolved">&#8212;</div><div class="sl">Closed</div></div>
+    <div class="sc crit"><div class="sn" id="s-breached">&#8212;</div><div class="sl">SLA Breached</div></div>
+  </div>
+  <div class="filter-bar">
+    <button class="chip active" data-filter="all">All</button>
+    <button class="chip" data-filter="open">Open</button>
+    <button class="chip" data-filter="unassigned">Unassigned</button>
+    <button class="chip" data-filter="in-progress">In Progress</button>
+    <button class="chip" data-filter="on-hold">On Hold</button>
+    <button class="chip" data-filter="closed">Closed</button>
+    <button class="chip" data-filter="mine">Assigned to me</button>
+    <button class="chip" data-filter="breached">SLA Breached</button>
+  </div>
+  <table class="ticket-table" id="main-table">
+    <thead><tr>
+      <th data-col="id">ID<span class="sort-icon">&#8597;</span></th>
+      <th data-col="subject">Subject<span class="sort-icon">&#8597;</span></th>
+      <th data-col="cat" class="col-cat" id="th-category">Category<span class="sort-icon">&#8597;</span><span class="flt" data-filtercol="category" title="Filter by category">&#9660;</span></th>
+      <th data-col="priority" id="th-priority">Priority<span class="sort-icon">&#8597;</span><span class="flt" data-filtercol="priority" title="Filter by priority">&#9660;</span></th>
+      <th data-col="status" id="th-status">Status<span class="sort-icon">&#8597;</span><span class="flt" data-filtercol="status" title="Filter by status">&#9660;</span></th>
+      <th>SLA</th>
+      <th data-col="assignee" id="th-assigned">Assigned<span class="sort-icon">&#8597;</span><span class="flt" data-filtercol="assigned" title="Filter by agent">&#9660;</span></th>
+      <th data-col="created">Submitted<span class="sort-icon">&#8597;</span></th>
+    </tr></thead>
+    <tbody id="ticket-body"><tr class="loading-row"><td colspan="8">Loading&hellip;</td></tr></tbody>
+  </table>
+  <div class="empty hidden" id="empty-state"><div class="big">&#10003;</div><p>No tickets match this filter.</p></div>
+</div>
+
+<!-- ARCHIVE -->
+<div class="page" id="page-archive">
+  <div class="ph">
+    <h1>Archive</h1>
+    <div class="pa"><button class="btn" id="btn-export-archive">&#8659; Export CSV</button></div>
+  </div>
+  <p class="txt-muted-sm-mb">Closed tickets older than your archive threshold appear here.</p>
+  <table class="ticket-table">
+    <thead><tr><th>ID</th><th>Subject</th><th>Priority</th><th>Closed</th><th>Assigned</th></tr></thead>
+    <tbody id="archive-body"><tr class="loading-row"><td colspan="5">Loading&hellip;</td></tr></tbody>
+  </table>
+  <div class="empty hidden" id="archive-empty"><div class="big">&#128193;</div><p>No archived tickets yet.</p></div>
+</div>
+
+<!-- REPORTS -->
+<div class="page" id="page-reports">
+  <div class="ph">
+    <h1>Reports</h1>
+    <div class="pa">
+      <span class="txt-muted-xs" id="report-updated"></span>
+      <button class="btn" id="btn-report-refresh">&#8635; Refresh</button>
+      <div class="pos-rel-inline" id="export-wrap">
+        <button class="btn" id="btn-export-toggle">&#8659; Export &#9662;</button>
+        <div class="export-menu-panel" id="export-menu">
+          <div class="export-menu-lbl">PDF — print / save</div>
+          <button class="export-item" id="btn-export-pdf-active">&#128196; Current section as PDF</button>
+          <button class="export-item" id="btn-export-pdf-all">&#128196; All sections as PDF</button>
+          <div class="export-menu-lbl-mid">CSV — raw data</div>
+          <button class="export-item" id="btn-export-csv-active">&#128202; Current section as CSV</button>
+          <button class="export-item" id="btn-export-csv-all">&#128202; All sections as CSV</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sub-nav -->
+  <div class="filter-bar mb-28">
+    <button class="chip active" id="rc-tickets">&#127897; Tickets</button>
+    <button class="chip"        id="rc-defender">&#128737; Defender</button>
+    <button class="chip"        id="rc-phishing">&#127907; Phriendly Phishing</button>
+    <button class="chip"        id="rc-syskit">&#128202; Syskit</button>
+  </div>
+
+  <!-- ══ TICKETS REPORT ══ -->
+  <div class="report-section active" id="rs-tickets">
+    <div class="section-hdr-row">
+      <span class="txt-muted-xs">Computed from live ticket data &middot; <span class="data-status live">&#9679; Live</span></span>
+      <select id="rpt-range" class="si select-rng">
+        <option value="7">Last 7 days</option>
+        <option value="30" selected>Last 30 days</option>
+        <option value="90">Last 90 days</option>
+        <option value="0">All time</option>
+      </select>
+    </div>
+    <div class="rc-grid">
+      <div class="rc"><div class="rc-title">Total tickets</div><div class="rc-val" id="rpt-total">&#8212;</div><div class="rc-sub" id="rpt-total-sub"></div></div>
+      <div class="rc"><div class="rc-title">Resolved / closed</div><div class="rc-val" id="rpt-resolved">&#8212;</div><div class="rc-sub" id="rpt-resolved-sub"></div><div class="rc-bar"><div class="rc-bar-fill bar-zero" id="rpt-resolved-bar"></div></div></div>
+      <div class="rc"><div class="rc-title">SLA compliance</div><div class="rc-val" id="rpt-sla">&#8212;</div><div class="rc-sub">tickets met SLA target</div><div class="rc-bar"><div class="rc-bar-fill bar-zero" id="rpt-sla-bar"></div></div></div>
+      <div class="rc"><div class="rc-title">Unassigned</div><div class="rc-val" id="rpt-unassigned">&#8212;</div><div class="rc-sub">open with no agent</div></div>
+    </div>
+    <div class="two-col-grid">
+      <div class="report-panel"><h2>By category</h2><div id="rpt-by-cat"><div class="txt-muted-sm">No data</div></div></div>
+      <div class="report-panel"><h2>By priority</h2><div id="rpt-by-pri"><div class="txt-muted-sm">No data</div></div></div>
+    </div>
+    <div class="report-panel"><h2>By agent</h2><div id="rpt-by-agent"><div class="txt-muted-sm">No data</div></div></div>
+  </div>
+
+  <!-- ══ DEFENDER REPORT ══ -->
+  <div class="report-section" id="rs-defender">
+    <div class="config-note hidden" id="defender-config-note">
+      <strong class="label-block">Microsoft Graph permissions needed</strong>
+      To pull live Defender alerts, your Azure app registration needs <strong>SecurityAlert.Read.All</strong> with admin consent. Until then, enter data manually below.
+    </div>
+    <div class="section-hdr-row">
+      <span class="data-status" id="defender-status-badge">&#9679; Checking&hellip;</span>
+      <button class="btn sm" id="btn-defender-fetch">&#8635; Try live fetch</button>
+    </div>
+    <div class="manual-entry-wrap" id="defender-manual">
+      <h3>Manual data entry — paste from Defender portal</h3>
+      <div class="me-grid mb-12">
+        <div class="me-field"><label>High severity</label><input type="number" id="def-high" min="0" value="0"/></div>
+        <div class="me-field"><label>Medium severity</label><input type="number" id="def-med" min="0" value="0"/></div>
+        <div class="me-field"><label>Low severity</label><input type="number" id="def-low" min="0" value="0"/></div>
+        <div class="me-field"><label>Informational</label><input type="number" id="def-info" min="0" value="0"/></div>
+        <div class="me-field"><label>New (this week)</label><input type="number" id="def-new" min="0" value="0"/></div>
+        <div class="me-field"><label>Resolved (this week)</label><input type="number" id="def-resolved" min="0" value="0"/></div>
+      </div>
+      <button class="btn pri sm" id="btn-defender-save">Save snapshot</button>
+      <span class="save-confirm" id="def-saved">&#10003; Saved</span>
+    </div>
+    <div class="rc-grid">
+      <div class="rc"><div class="rc-title">High severity</div><div class="rc-val txt-danger" id="def-s-high">&#8212;</div><div class="rc-sub">active alerts</div></div>
+      <div class="rc"><div class="rc-title">Medium severity</div><div class="rc-val txt-warn" id="def-s-med">&#8212;</div><div class="rc-sub">active alerts</div></div>
+      <div class="rc"><div class="rc-title">Low severity</div><div class="rc-val txt-ok" id="def-s-low">&#8212;</div><div class="rc-sub">active alerts</div></div>
+      <div class="rc"><div class="rc-title">Informational</div><div class="rc-val" id="def-s-info">&#8212;</div><div class="rc-sub">active alerts</div></div>
+    </div>
+    <div class="report-panel">
+      <h2>Recent alerts <span class="section-hint" id="def-alerts-src"></span></h2>
+      <div id="def-alert-list"><div class="section-div-lbl">Enter data above or connect via Graph API.</div></div>
+    </div>
+  </div>
+
+  <!-- ══ PHISHING REPORT ══ -->
+  <div class="report-section" id="rs-phishing">
+    <div class="config-note hidden" id="phishing-flow-note">
+      <strong class="label-block">Power Automate flow not configured</strong>
+      Add your Phriendly Phishing flow URL in Settings &rarr; Report integrations to pull data automatically. Until then, enter manually below.
+    </div>
+    <div class="section-hdr-row">
+      <span class="data-status" id="phish-status-badge">&#9679; Manual</span>
+      <button class="btn sm" id="btn-phishing-fetch">&#8635; Try flow fetch</button>
+    </div>
+    <div class="manual-entry-wrap" id="phishing-manual">
+      <h3>Manual data entry — paste from Phriendly Phishing dashboard</h3>
+      <div class="me-grid mb-12">
+        <div class="me-field"><label>Campaign name</label><input type="text" id="ph-campaign" placeholder="e.g. April 2025"/></div>
+        <div class="me-field"><label>Emails sent</label><input type="number" id="ph-sent" min="0" value="0"/></div>
+        <div class="me-field"><label>Opened email</label><input type="number" id="ph-opened" min="0" value="0"/></div>
+        <div class="me-field"><label>Clicked link</label><input type="number" id="ph-clicked" min="0" value="0"/></div>
+        <div class="me-field"><label>Submitted data</label><input type="number" id="ph-submitted" min="0" value="0"/></div>
+        <div class="me-field"><label>Reported phish</label><input type="number" id="ph-reported" min="0" value="0"/></div>
+        <div class="me-field"><label>Training completed</label><input type="number" id="ph-trained" min="0" value="0"/></div>
+        <div class="me-field"><label>At risk (%)</label><input type="number" id="ph-atrisk" min="0" max="100" value="0"/></div>
+      </div>
+      <button class="btn pri sm" id="btn-phishing-save">Save snapshot</button>
+      <span class="save-confirm" id="ph-saved">&#10003; Saved</span>
+    </div>
+    <div class="rc-grid">
+      <div class="rc"><div class="rc-title">Click rate</div><div class="rc-val" id="ph-s-click">&#8212;</div><div class="rc-sub">clicked the link</div><div class="rc-bar"><div class="rc-bar-fill crit bar-zero" id="ph-bar-click"></div></div></div>
+      <div class="rc"><div class="rc-title">Report rate</div><div class="rc-val" id="ph-s-report">&#8212;</div><div class="rc-sub">reported the phish</div><div class="rc-bar"><div class="rc-bar-fill bar-zero" id="ph-bar-report"></div></div></div>
+      <div class="rc"><div class="rc-title">Training done</div><div class="rc-val" id="ph-s-trained">&#8212;</div><div class="rc-sub">completed training</div><div class="rc-bar"><div class="rc-bar-fill bar-zero" id="ph-bar-trained"></div></div></div>
+      <div class="rc"><div class="rc-title">At risk</div><div class="rc-val txt-danger" id="ph-s-atrisk">&#8212;</div><div class="rc-sub">% of staff</div></div>
+    </div>
+    <div class="report-panel">
+      <h2>Campaign breakdown <span class="section-hint" id="ph-campaign-label"></span></h2>
+      <div id="ph-breakdown"><div class="section-div-lbl">Enter campaign data above.</div></div>
+    </div>
+  </div>
+
+  <!-- ══ SYSKIT REPORT ══ -->
+  <div class="report-section" id="rs-syskit">
+    <div class="section-hdr-row">
+      <span class="txt-muted-xs"><span class="data-status manual">&#9679; Manual</span> &middot; Export from Syskit Point and paste figures here</span>
+    </div>
+    <div class="manual-entry-wrap">
+      <h3>Governance snapshot — paste from Syskit Point</h3>
+      <div class="me-grid mb-12">
+        <div class="me-field"><label>Active Teams</label><input type="number" id="sk-teams" min="0" value="0"/></div>
+        <div class="me-field"><label>Inactive Teams</label><input type="number" id="sk-teams-inactive" min="0" value="0"/></div>
+        <div class="me-field"><label>M365 Groups</label><input type="number" id="sk-groups" min="0" value="0"/></div>
+        <div class="me-field"><label>Orphaned</label><input type="number" id="sk-orphaned" min="0" value="0"/></div>
+        <div class="me-field"><label>Licensed users</label><input type="number" id="sk-users" min="0" value="0"/></div>
+        <div class="me-field"><label>Guest users</label><input type="number" id="sk-guests" min="0" value="0"/></div>
+        <div class="me-field"><label>Inactive users</label><input type="number" id="sk-inactive" min="0" value="0"/></div>
+        <div class="me-field"><label>Shared mailboxes</label><input type="number" id="sk-shared" min="0" value="0"/></div>
+        <div class="me-field"><label>Anon share links</label><input type="number" id="sk-anon" min="0" value="0"/></div>
+        <div class="me-field"><label>Ext. share links</label><input type="number" id="sk-ext" min="0" value="0"/></div>
+        <div class="me-field"><label>Storage used (GB)</label><input type="number" id="sk-storage" min="0" value="0" step="0.1"/></div>
+        <div class="me-field"><label>Storage total (GB)</label><input type="number" id="sk-storage-total" min="0" value="0" step="0.1"/></div>
+      </div>
+      <button class="btn pri sm" id="btn-syskit-save">Save snapshot</button>
+      <span class="save-confirm" id="sk-saved">&#10003; Saved</span>
+    </div>
+    <div class="rc-grid">
+      <div class="rc"><div class="rc-title">Active Teams</div><div class="rc-val" id="sk-s-teams">&#8212;</div><div class="rc-sub" id="sk-s-teams-sub"></div></div>
+      <div class="rc"><div class="rc-title">Guest users</div><div class="rc-val txt-warn" id="sk-s-guests">&#8212;</div><div class="rc-sub">external access</div></div>
+      <div class="rc"><div class="rc-title">Anonymous links</div><div class="rc-val txt-danger" id="sk-s-anon">&#8212;</div><div class="rc-sub">review recommended</div></div>
+      <div class="rc"><div class="rc-title">Storage used</div><div class="rc-val" id="sk-s-storage">&#8212;</div><div class="rc-sub" id="sk-s-storage-sub"></div><div class="rc-bar"><div class="rc-bar-fill warn bar-zero" id="sk-bar-storage"></div></div></div>
+    </div>
+    <div class="two-col-grid">
+      <div class="report-panel"><h2>Teams &amp; Groups</h2><div id="sk-teams-breakdown"><div class="txt-muted-sm">Enter data above.</div></div></div>
+      <div class="report-panel"><h2>Users</h2><div id="sk-users-breakdown"><div class="txt-muted-sm">Enter data above.</div></div></div>
+    </div>
+    <div class="report-panel"><h2>Sharing &amp; governance risks</h2><div id="sk-sharing-breakdown"><div class="txt-muted-sm">Enter data above.</div></div></div>
+  </div>
+</div>
+
+<!-- SETTINGS -->
+<div class="page" id="page-settings">
+  <div class="ph"><h1>Settings</h1></div>
+  <div class="ss">
+    <div class="ssh"><h2>Agent Access &amp; Roles</h2><p>Manage who can access the dashboard. Only admins can add or remove agents.</p><p class="warn-hint">&#9888; When adding a new agent, also grant them <strong>Read</strong> access to the IT SharePoint site under Site permissions — otherwise they will see an access denied screen.</p></div>
+    <div class="sb">
+      <div class="agent-list" id="agent-list"></div>
+      <div id="agent-add-section">
+        <div class="add-row">
+          <input type="email" id="new-agent-email" class="si input-flex" placeholder="name@ecnz.ac.nz"/>
+          <select id="new-agent-role" class="si"><option value="agent">Agent</option><option value="admin">Administrator</option></select>
+          <button class="btn pri" id="btn-add-agent">+ Add</button>
+        </div>
+        <div class="settings-saved" id="agent-err"></div>
+      </div>
+      <div id="agent-locked-msg" class="admin-only-lock hidden">&#128274; Only administrators can add or remove agents.</div>
+    </div>
+  </div>
+  <div class="ss">
+    <div class="ssh"><h2>SLA Targets</h2><p>Maximum response time before a ticket is flagged as breached. Admin only.</p></div>
+    <div class="sb">
+      <div class="sr"><div><div class="slbl">&#128308; Critical</div><div class="sdesc">Complete outage, no workaround</div></div><div class="flex-gap-xs"><input type="number" id="s-sla-crit" class="si sla-col-val" value="1" min="1"/><span class="txt-muted-xs">hrs</span></div></div>
+      <div class="sr"><div><div class="slbl">&#128992; High</div><div class="sdesc">Cannot work, no workaround</div></div><div class="flex-gap-xs"><input type="number" id="s-sla-high" class="si sla-col-val" value="4" min="1"/><span class="txt-muted-xs">hrs</span></div></div>
+      <div class="sr"><div><div class="slbl">&#128993; Medium</div><div class="sdesc">Workaround available</div></div><div class="flex-gap-xs"><input type="number" id="s-sla-med" class="si sla-col-val" value="8" min="1"/><span class="txt-muted-xs">hrs</span></div></div>
+      <div class="sr"><div><div class="slbl">&#128994; Low</div><div class="sdesc">Minor inconvenience</div></div><div class="flex-gap-xs"><input type="number" id="s-sla-low" class="si sla-col-val" value="24" min="1"/><span class="txt-muted-xs">hrs</span></div></div>
+    </div>
+  </div>
+  <div class="ss">
+    <div class="ssh"><h2>General</h2><p>Display and behaviour preferences</p></div>
+    <div class="sb">
+      <div class="sr"><div><div class="slbl">Show demo data when no tickets</div><div class="sdesc">Fills dashboard with sample tickets until real ones arrive</div></div><label class="toggle"><input type="checkbox" id="s-demo" checked/><span class="ts"></span></label></div>
+      <div class="sr"><div><div class="slbl">Auto-refresh every 5 minutes</div><div class="sdesc">Automatically reload tickets while the dashboard is open</div></div><label class="toggle"><input type="checkbox" id="s-autorefresh"/><span class="ts"></span></label></div>
+      <div class="sr"><div><div class="slbl">Archive closed tickets after (days)</div><div class="sdesc">Closed tickets older than this move to Archive. Set to 0 to archive immediately on close.</div></div><input type="number" id="s-archivedays" class="si sla-col-def" value="7" min="0" max="90"/></div>
+    </div>
+  </div>
+  <div class="ss">
+    <div class="ssh"><h2>Power Automate — Email Flows</h2><p>Only email flows are needed now. SharePoint read/write is handled directly.</p></div>
+    <div class="sb">
+      <div class="sr col"><div class="slbl">Send reply (Flow 4)</div><input type="url" id="s-fl-reply" class="si wide" placeholder="https://prod-xx..."/></div>
+      <div class="sr col no-border-b"><div class="slbl">Submit ticket confirmation (Flow 1)</div><input type="url" id="s-fl-submit" class="si wide" placeholder="https://prod-xx..."/></div>
+    </div>
+  </div>
+  <div class="ss">
+    <div class="ssh"><h2>Report integrations</h2><p>Configure data sources for the Reports tab. Power Automate flows bridge APIs that don't support CORS.</p></div>
+    <div class="sb">
+      <div class="sr col"><div class="slbl">Phriendly Phishing — Flow URL</div><div class="sdesc">Power Automate flow that calls the Phriendly Phishing API and returns campaign JSON</div><input type="url" id="s-fl-phishing" class="si wide" placeholder="https://prod-xx..."/></div>
+      <div class="sr col no-border-b"><div class="slbl">Syskit Point — Flow URL</div><div class="sdesc">Optional: Power Automate flow that returns a Syskit governance snapshot JSON</div><input type="url" id="s-fl-syskit" class="si wide" placeholder="https://prod-xx..."/></div>
+    </div>
+  </div>
+  <div class="save-bar">
+    <button class="btn pri" id="btn-settings-save">Save all settings</button>
+    <span class="saved" id="saved-msg">&#10003; Settings saved</span>
+    <span class="update-dot" id="settings-err"></span>
+  </div>
+</div>
+
+<!-- PANEL -->
+<div class="ov" id="panel-ov"></div>
+<div class="panel" id="panel">
+  <button class="btn sm self-end" id="btn-panel-close">&#10005; close</button>
+  <div class="tid" id="p-id"></div>
+  <div class="ptitle" id="p-title"></div>
+
+  <!-- Requester -->
+  <div class="p-requester-row">
+    <div><div class="plbl">Requester</div><div class="fw-500" id="p-name"></div><div id="p-email" class="pmeta"></div><div id="p-dept" class="pmeta"></div></div>
+  </div>
+
+  <!-- Original request -->
+  <div><div class="plbl">Original request</div><div class="pbody" id="p-body"></div></div>
+
+  <!-- Meta card: Category · Priority · Status · SLA -->
+  <div class="panel-meta-card">
+    <div><div class="plbl">Category</div><select class="psel" id="p-cat-sel"></select></div>
+    <div><div class="plbl">Priority</div><select class="psel" id="p-priority-sel"><option value="low">&#128994; Low</option><option value="medium">&#128993; Medium</option><option value="high">&#128992; High</option><option value="critical">&#128308; Critical</option></select></div>
+    <div><div class="plbl">Status</div><select class="psel" id="p-status-sel"></select></div>
+    <div><div class="plbl">SLA</div><div class="sla-block" id="p-sla-block"><div class="sla-cd" id="p-sla-cd">—</div><div class="sla-lbl" id="p-sla-lbl">—</div></div></div>
+  </div>
+
+  <!-- Assigned to -->
+  <div>
+    <div class="plbl">Assigned to</div>
+    <div class="flex-wrap-gap">
+      <select class="psel flex-asg" id="p-asg-sel"></select>
+      <button class="btn ok" id="pickup-btn">&#9995; Pick up</button>
+    </div>
+  </div>
+
+  <hr class="div"/>
+
+  <!-- Conversation -->
+  <div><div class="plbl">Conversation</div><div class="rt" id="reply-thread"></div></div>
+
+  <!-- Attachments -->
+  <div>
+    <div class="plbl">Attachments</div>
+    <div id="attachment-list" class="attachment-list"><div class="txt-muted-xs">Loading&hellip;</div></div>
+    <div class="attachment-upload-row">
+      <label>&#128206; Choose file(s)<input type="file" id="attachment-file" multiple/></label>
+      <button class="btn sm" id="btn-upload-attachment">&#8593; Upload</button>
+      <span class="attach-status" id="attach-status"></span>
+    </div>
+  </div>
+
+  <!-- Email compose block -->
+  <div class="compose-block">
+    <div class="compose-row">
+      <span class="compose-lbl">To</span>
+      <span class="compose-to" id="compose-to"></span>
+    </div>
+    <div class="compose-row">
+      <span class="compose-lbl">Cc</span>
+      <div class="compose-cc-wrap">
+        <div id="watcher-tags" class="watcher-tags"></div>
+        <input type="email" id="watcher-input" class="compose-cc-input" placeholder="Add email and press Enter&hellip;"/>
+      </div>
+    </div>
+    <textarea class="compose-body" id="p-reply" placeholder="Type your reply — this will be emailed to the requester&hellip;"></textarea>
+    <div class="compose-footer">
+      <span class="rs" id="reply-status"></span>
+      <button class="btn ok" id="send-btn">&#9993; Send reply</button>
+    </div>
+  </div>
+
+  <hr class="div"/>
+
+  <!-- Internal notes -->
+  <div><div class="plbl">Internal notes (not sent to staff)</div><textarea class="ptx notes" id="p-notes" placeholder="Add internal notes&hellip;"></textarea></div>
+
+  <!-- Activity log -->
+  <div>
+    <div class="plbl">Activity log</div>
+    <div class="audit-log" id="audit-log"><div class="txt-muted-xs">No activity recorded yet.</div></div>
+  </div>
+  <div class="ar">
+    <button class="btn pri" id="btn-save-notes">Save notes</button>
+    <button class="btn" id="cycle-btn">Mark in progress</button>
+    <button class="btn btn-merge-auto" id="btn-merge">&#8644; Merge</button>
+    <button class="btn danger" id="del-btn">Delete</button>
+  </div>
+</div>
+
+<!-- WORKLOAD MODAL -->
+<div class="modal-ov" id="workload-modal-ov">
+  <div class="modal">
+    <button class="modal-close" id="btn-workload-close">&#10005;</button>
+    <h2>Agent Workload</h2>
+    <div id="workload-body"><div class="txt-muted-sm">Loading&hellip;</div></div>
+  </div>
+</div>
+
+<!-- MERGE MODAL -->
+<div class="modal-ov" id="merge-modal-ov">
+  <div class="modal">
+    <button class="modal-close" id="btn-merge-close">&#10005;</button>
+    <h2>Merge Ticket</h2>
+    <p class="merge-desc">Select the ticket to merge <strong>into</strong> the current one. Replies from both tickets will be combined. The selected ticket will be closed.</p>
+    <input type="text" class="si merge-search" id="merge-search" placeholder="Search by ID or subject&hellip;"/>
+    <div class="merge-list" id="merge-list"></div>
+    <div class="modal-actions">
+      <button class="btn" id="btn-merge-cancel">Cancel</button>
+      <button class="btn pri" id="btn-merge-confirm">&#8644; Merge tickets</button>
+    </div>
+  </div>
+</div>
+
+<script src="dashboard.js"></script>
+</body>
+</html>
