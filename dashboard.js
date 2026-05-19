@@ -116,6 +116,14 @@ function showPage(p){
   document.querySelectorAll('.nav-btn').forEach(function(b){b.classList.remove('active');});
   document.getElementById('page-'+p).classList.add('active');
   document.getElementById('nb-'+p).classList.add('active');
+  // Update the top-bar page label + data attribute (CSS uses it to hide search on certain pages)
+  var labelEl=document.getElementById('topbar-pagelabel');
+  if(labelEl){
+    var labels={tickets:'Tickets',archive:'Archive',reports:'Reports',settings:'Settings'};
+    labelEl.textContent=labels[p]||'';
+  }
+  var shell=document.getElementById('app-shell');
+  if(shell) shell.setAttribute('data-active-page',p);
   if(p==='archive') renderArchive();
   if(p==='reports'){ loadSyskitSaved(); loadDefenderSaved(); loadPhishingSaved(); renderTicketReport(); document.getElementById('report-updated').textContent='Updated '+new Date().toLocaleTimeString('en-NZ',{hour:'2-digit',minute:'2-digit'}); }
   if(p==='settings'){if(currentRole!=='admin'){alert('Settings are restricted to administrators.');return;}loadSettingsUI();}
