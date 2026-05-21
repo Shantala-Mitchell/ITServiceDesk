@@ -20,7 +20,7 @@ var TEAM_NAME      = 'IT Service Desk';
 /* Archive threshold — tickets closed longer than this (in days) move to Archive.
    This value is shared across all agents on this deployment.
    0 = archive immediately on close. */
-var ARCHIVE_DAYS   = 7;
+var ARCHIVE_DAYS   = 0;
 
 /* Fallback admin if the Agents list is empty or unreachable */
 var DEFAULT_AGENTS = [{email: 'shantala.mitchell@ecnz.ac.nz', role: 'admin'}];
